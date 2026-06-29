@@ -22,8 +22,8 @@
 **What prevents it — the auth→RLS chain (impl §3a), fail-closed.**
 1. `co_op_id` is resolved **server-side from the trusted Postgres session record** — never from client input.
 2. Every request runs in a transaction whose first statement is `SET LOCAL app.current_co_op = <resolved id>` — transaction-scoped, so it cannot outlive the txn or leak across pool reuse.
-3. Every policy filters `co_op_id = current_setting('app.current_co_op')::uuid` with **no null-permissive branch**; the app DB role is **non-superuser and never granted `BYPASSRLS`**.
-4. Unset context → `current_setting` is NULL → predicate is NULL → **zero rows**. Default-deny (ADR-0002) means a careless `CREATE TABLE` is tenant-scoped automatically; only a reviewed exception opens a hole.
+3. Every policy filters `co_op_id = nullif(current_setting('app.current_co_op', true), '')::uuid` with **no null-permissive branch**; the app DB role is **non-superuser and never granted `BYPASSRLS`**.
+4. Unset **or empty** context → `nullif(…, '')` collapses to NULL → predicate is NULL → **zero rows** (a pooled connection reused after a tenant txn reverts the setting to `''`; the `nullif` guard keeps that path returning zero rows instead of erroring on `''::uuid` — found by the fail-closed test). Default-deny (ADR-0002) means a careless `CREATE TABLE` is tenant-scoped automatically; only a reviewed exception opens a hole.
 
 **Proof.** Mandatory TDD invariant (§1, §8a): a seeded **dormant second co-op**; a query in A's context returns **zero** of B's rows, **and** a query with no `SET LOCAL` returns **zero** rows (fail-closed). Runs in the fast CI gate on every PR. *(Phase 1.)*
 

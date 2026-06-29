@@ -391,3 +391,12 @@ This is a load-bearing wall (onboarding §2). Test is written **first**, with a 
 6. **Fail-closed false-green →** positive control added: prove A sees A's rows, then prove no-context sees zero (Task 5).
 7. **citext extension →** `CREATE EXTENSION IF NOT EXISTS citext;` precedes use (Task 3).
 8. **Email uniqueness →** `UNIQUE (co_op_id, email)` — per-tenant, not global (Task 3).
+
+## Execution notes (build — Phase 1, in progress)
+Structural deltas discovered while executing (full detail in git history):
+- **Migration split:** RLS landed as `0002_rls.sql` (not appended to the applied `0001`); a **`0003_rls_nullif.sql`** hardening followed. Never edit an applied migration.
+- **Fail-closed hardening (found by the Task 5 test):** policy predicate is `co_op_id = nullif(current_setting('app.current_co_op', true), '')::uuid`. A pooled connection reused after a tenant txn reverts the GUC to `''`; a bare `::uuid` cast errors, so `nullif(…, '')` collapses empty **or** unset to NULL → zero rows. (Threat-model mode 1 updated to match.)
+- **Bootstrap:** DB + extensions (citext, pgcrypto) + the two roles are created by `platform/db/roles.sql` via `ops/bootstrap.sh` (superuser); `ops/migrations/run.ts` applies migrations as `app_owner`, tracked in `schema_migrations`.
+- **Env:** `dotenv` dropped; scripts read a shell-sourced `.env` (gitignored).
+- **Local runtime:** the existing native Postgres (pg 14) is used for local verification; `docker` is not installed, so the compose boot-verify + Task 8 restore drill run where docker exists (staging/CI).
+- **Seed role path:** `co_ops` provisioned as `app_owner` (no context); each co-op's `users`+`members` seeded via `withTenantTx` (the `app_user` runtime path) under its own context — the fixture itself exercises the policy.
