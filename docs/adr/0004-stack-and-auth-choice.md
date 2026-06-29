@@ -19,6 +19,8 @@ The string-taking helper `withTenantTx(coOpId, fn)` is **internal and not re-exp
 The app connects **directly as `app_user`** — `LOGIN, NOSUPERUSER, NOBYPASSRLS`, DML grants only. Migrations and seed/provisioning run as **`app_owner`** (owns the tables). **Invariant:** the runtime app role is never superuser and never holds `BYPASSRLS`. This resolves the earlier `NOLOGIN`-but-"connects-as" contradiction by choosing one pattern and making the role definition, connection strings (`APP_DATABASE_URL` vs `OWNER_DATABASE_URL`), and code comments all match it.
 
 ### 5. `co_ops` is the tenant anchor — bespoke policy, no `co_op_id` column (the carve-out)
+**Status: LOCKED (2026-06-29).** Chosen deliberately over the `FORCE`-with-explicit-provisioning-policy alternative; the migration (plan Tasks 3–4) implements exactly the policy below — no ambiguity is to be (re)introduced at migration time.
+
 `co_ops` is keyed by its own `id`; it carries **no `co_op_id` column** (removing an unconstrained self-reference that nothing enforced). Its RLS is **bespoke, not the generic copy-paste** applied to the other tables:
 - `ENABLE` RLS but **do not `FORCE`** — so `app_owner` (table owner) can provision/seed co-ops **without** a tenant context. This resolves the chicken-and-egg on the very first co-op insert and on seeding the dormant second co-op.
 - `app_user` policy: `FOR SELECT USING (id = current_setting('app.current_co_op', true)::uuid)` — a co-op reads only its own row; **SELECT only** (co-op creation is a provisioner action at N=1, not an app-user action).

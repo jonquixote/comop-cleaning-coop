@@ -220,7 +220,7 @@ The dependency law must fail builds **from commit one**, before any module can l
   -- NO "OR ... IS NULL" branch. Repeat verbatim for sessions and members. NOT for co_ops.
   GRANT SELECT, INSERT, UPDATE, DELETE ON users, sessions, members TO app_user;
   ```
-- [ ] **Step 1b: Bespoke policy for the anchor table `co_ops`** (ADR-0004 §5 carve-out — **not** the generic shape; avoids the chicken-and-egg on the first co-op insert and on seeding co-op B):
+- [ ] **Step 1b: Bespoke policy for the anchor table `co_ops`** (ADR-0004 §5 carve-out, **LOCKED** — **not** the generic shape; avoids the chicken-and-egg on the first co-op insert and on seeding co-op B):
   ```sql
   ALTER TABLE co_ops ENABLE ROW LEVEL SECURITY;      -- ENABLE but do NOT FORCE:
   --   app_owner (table owner, not forced) provisions/seeds co-ops with NO tenant context;
