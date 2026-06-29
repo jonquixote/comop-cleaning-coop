@@ -1,0 +1,15 @@
+# OS
+.DS_Store
+
+# Secrets — never commit (.env.example is committed; .env is not)
+.env
+.env.*
+!.env.example
+
+# Node / build (forward-looking for Task 1+)
+node_modules/
+.next/
+dist/
+build/
+coverage/
+*.log
