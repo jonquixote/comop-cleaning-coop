@@ -1,0 +1,39 @@
+# ops/docker-compose.yml — reproducible local/staging stack (impl §2, §3).
+# The bootstrap `postgres` superuser exists only to run roles.sql, which creates
+# the two NON-superuser roles the system actually uses (ADR-0004 §4):
+#   app_owner  — owns schema/tables, runs migrations + seed
+#   app_user   — the runtime app role (DML only, never superuser, never BYPASSRLS)
+# Production pins images by @sha256 DIGEST (std §7); this dev compose pins an exact
+# minor tag and is the documented base for the Task 8 restore-drill scratch instance.
+services:
+  postgres:
+    image: postgres:16.4-alpine          # prod: replace with postgres@sha256:<digest> (std §7)
+    environment:
+      POSTGRES_USER: postgres            # bootstrap superuser — used only for roles.sql/admin
+      POSTGRES_PASSWORD: ${POSTGRES_SUPER_PASSWORD:?set POSTGRES_SUPER_PASSWORD in .env}
+      POSTGRES_DB: comop
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d comop"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Restore-drill target (Task 8): an isolated scratch Postgres, NEVER the working DB.
+  # Started only with `--profile scratch`.
+  postgres_scratch:
+    image: postgres:16.4-alpine
+    profiles: ["scratch"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPER_PASSWORD:?set POSTGRES_SUPER_PASSWORD in .env}
+      POSTGRES_DB: comop_scratch
+    ports: ["5433:5432"]
+
+  # app: Next.js surfaces — a Dockerfile is added when the app surfaces are built
+  # (later build-order phases). Omitted at Phase 1 so the foundation stack is just Postgres.
+
+volumes:
+  pgdata:
