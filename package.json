@@ -1,0 +1,22 @@
+{
+  "name": "comop-cleaning-coop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.12.3",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "boundaries": "node tools/check-boundaries.mjs",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm lint && pnpm boundaries"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "eslint": "^9.13.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.10.0",
+    "vitest": "^2.1.3"
+  }
+}
