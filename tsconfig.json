@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["platform", "sectors", "apps"]
+  "include": ["platform", "sectors", "apps", "ops", "tests"]
 }
