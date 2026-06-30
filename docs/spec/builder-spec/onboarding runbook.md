@@ -15,10 +15,13 @@
 ---
 
 ## 1. Boot the stack locally
+
+> ⚠️ Production Postgres runs as a native systemd service (`postgresql@16.service`), not in Docker. `docker compose up` is for local dev and restore-drill scratch only. See ADR-0006 and `ops/runbook.md`.
+
 ```
 git clone <repo> && cd <repo>
 cp .env.example .env        # fill secrets per the comments; never commit .env
-docker compose up           # brings up Postgres + app + workers
+docker compose up           # local dev Postgres only — NOT the production DB
 # in a second shell:
 <migrate-cmd>               # apply all migrations (e.g. drizzle migrate / migration runner)
 <seed-cmd>                  # seed one co-op + a dormant SECOND co-op (for RLS tests)

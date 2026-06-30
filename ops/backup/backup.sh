@@ -5,6 +5,7 @@
 # under the spec's staging allowance. This logical backup proves the off-site+restore
 # FLOOR now. pg_dump runs as SUPERUSER on purpose: app_owner is subject to FORCE RLS and
 # would dump ZERO rows from users/sessions/members.
+# On production, pgBackRest runs against the native Postgres data directory directly — not a Docker volume.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 if [ -f .env ]; then set -a; source .env; set +a; fi   # CI sets env directly; local sources .env

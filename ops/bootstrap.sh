@@ -2,6 +2,7 @@
 # ops/bootstrap.sh — one-time (idempotent) DB + role bootstrap. Run as a Postgres
 # SUPERUSER. Creates the database, the citext/pgcrypto extensions, and the two
 # NON-superuser roles (ADR-0004 §4). Reads .env. Migrations run separately (run.ts).
+# Run against a native Postgres install in production, or the dev compose stack locally.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 if [ -f .env ]; then set -a; source .env; set +a; fi   # CI sets env directly; local sources .env

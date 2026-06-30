@@ -27,7 +27,9 @@ Run nightly + pre-release (and by hand in your first week). Steps the script per
 Same as the drill but restore into the **real** target (a new primary), then re-point the app's `APP_DATABASE_URL`/`OWNER_DATABASE_URL`. With pgBackRest: `pgbackrest --stanza=comop restore` + replay WAL to the target time, then start Postgres.
 
 ## Reproducible rebuild (impl §3.6)
-On a bare box: `docker compose up` (or native Postgres) → `ops/bootstrap.sh` (db + roles + extensions) → `pnpm tsx ops/migrations/run.ts` (schema) → `restore-drill.sh` path to load data. Tested end-to-end before launch.
+On a bare box: `docker compose up` (local dev only — see ADR-0006) or start the native systemd service → `ops/bootstrap.sh` (db + roles + extensions) → `pnpm tsx ops/migrations/run.ts` (schema) → `restore-drill.sh` path to load data. Tested end-to-end before launch.
+
+**Production Postgres is a native systemd service.** Use the distro-packaged unit (`postgresql@16.service`); do not write a custom unit — the packaged one already sets `RemoveIPC=no`. Manage with `systemctl start|stop|restart postgresql@16` on the production host. `docker compose up` is for local dev and the restore-drill scratch instance only.
 
 ## Cert / key rotation
 - **`BACKUP_PASS`:** rotate by taking a fresh backup under the new pass; keep the old pass until all backups encrypted under it age out of retention (else old backups become undecryptable).
