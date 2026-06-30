@@ -26,15 +26,19 @@ const ADDON_LABOR_MIN: Record<string, number> = {
   windows: 25,
 };
 
-export function priceJob(details: CleaningJobDetails, policy: PolicySnapshot): PriceBreakdown {
+// Sector-owned duration estimate (minutes). Shared by priceJob and the adapter.
+export function estimateMinutes(details: CleaningJobDetails): number {
   const addonMinutes = details.addons.reduce((m, a) => m + (ADDON_LABOR_MIN[a] ?? 0), 0);
-  const minutes =
+  return (
     details.bedrooms * MIN_PER_BEDROOM +
     details.bathrooms * MIN_PER_BATHROOM +
     Math.ceil(details.sqft / 100) * MIN_PER_100_SQFT +
-    addonMinutes;
+    addonMinutes
+  );
+}
 
-  const labor_cents = minutes * LABOR_RATE_CENTS_PER_MIN;
+export function priceJob(details: CleaningJobDetails, policy: PolicySnapshot): PriceBreakdown {
+  const labor_cents = estimateMinutes(details) * LABOR_RATE_CENTS_PER_MIN;
   const materials_cents = MATERIALS_BASE_CENTS + details.bathrooms * MATERIALS_PER_BATHROOM_CENTS;
   const overhead_alloc_cents = Math.round((labor_cents + materials_cents) * OVERHEAD_PCT);
 
