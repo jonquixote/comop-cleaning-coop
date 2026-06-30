@@ -13,3 +13,7 @@ dist/
 build/
 coverage/
 *.log
+
+# Backups — encrypted dumps live off-box, never in the repo
+*.dump.enc
+comop-offsite/
