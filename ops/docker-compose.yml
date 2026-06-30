@@ -1,4 +1,6 @@
-# ops/docker-compose.yml — reproducible local/staging stack (impl §2, §3).
+# ops/docker-compose.yml — LOCAL DEV AND RESTORE-DRILL SCRATCH ONLY. Production Postgres
+# runs native (apt + systemd) — do not use this as the production DB. See ADR-0006.
+# Reproducible local/staging stack (impl §2, §3).
 # The bootstrap `postgres` superuser exists only to run roles.sql, which creates
 # the two NON-superuser roles the system actually uses (ADR-0004 §4):
 #   app_owner  — owns schema/tables, runs migrations + seed

@@ -43,7 +43,7 @@ Chosen for low recurring cost, longevity, reproducibility, and operability by no
 |---|---|---|
 | **Database** | **PostgreSQL, self-hosted** (the architectural keystone — RLS is a *Postgres* feature, not a vendor's) | No lock-in; RLS gives tenancy + exit-as-export; the one component that must be rock-solid |
 | **Compute** | A single well-specced VPS to start (e.g., **Hetzner** dedicated/cloud or equivalent) — *not* hyperscaler markup | "Cheap without being cheap": serious price/performance, scale up before scaling out |
-| **Containerization** | **Docker + docker-compose** | Reproducible, documented, portable — a monument must be rebuildable from source on a fresh box |
+| **Containerization** | Docker / docker-compose — local dev and restore-drill scratch only. Production Postgres runs native (apt + systemd). See ADR-0006. | Reproducible, documented, portable — a monument must be rebuildable from source on a fresh box |
 | **App framework** | **Next.js (App Router)**, TypeScript | Builder knows it; one framework for both surfaces; SSR + API in one |
 | **Auth** | **A currently-maintained self-hosted session-auth approach** (magic-link + password; sessions stored in *your* Postgres). *Specified by property, not brand — do not hard-anchor a monument on one library* | No auth SaaS dependency or per-MAU billing; the tenant identity it yields drives RLS (§3a) |
 | **Migrations** | Version-controlled schema migrations (e.g., **Drizzle** or raw-SQL migration runner) committed to `/ops` | Schema is code; reproducible; reviewable. Never edit prod schema by hand |
