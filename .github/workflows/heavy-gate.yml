@@ -1,0 +1,63 @@
+name: heavy-gate
+
+# Std §2/§7 heavy gate — nightly + pre-release. The restore drill is sacred; a failed
+# OR skipped drill fails this job, which IS the page (std §7). Not on every push.
+on:
+  schedule:
+    - cron: "0 7 * * *" # nightly 07:00 UTC
+  workflow_dispatch:
+
+jobs:
+  restore-drill:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_NAME: comop
+      SUPERUSER_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      OWNER_PASSWORD: ciowner
+      APP_PASSWORD: ciapp
+      OWNER_DATABASE_URL: postgresql://app_owner:ciowner@localhost:5432/comop
+      APP_DATABASE_URL: postgresql://app_user:ciapp@localhost:5432/comop
+      SESSION_SECRET: ci-not-secret-please-change-in-real-env
+      BACKUP_PASS: ci-not-secret-backup-pass
+      SCRATCH_DB_NAME: comop_scratch
+      PAGE_CHANNEL: github-actions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      # pg_dump/pg_restore client must be >= the server (16). ubuntu-24.04 ships client 16.
+      - name: Install postgresql client (pg_dump/pg_restore/psql)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: pnpm install --frozen-lockfile
+      # Off-site stand-in on the runner host (off the DB service container). Real off-site:
+      # set OFFSITE_REPO to rclone:b2:<bucket> / s3://<bucket> from repo secrets.
+      - name: Set OFFSITE_REPO
+        run: echo "OFFSITE_REPO=${RUNNER_TEMP}/offsite" >> "$GITHUB_ENV"
+      - name: Bootstrap + migrate + seed
+        run: |
+          bash ops/bootstrap.sh
+          pnpm exec tsx ops/migrations/run.ts
+          pnpm exec tsx ops/seed.ts
+      - name: Encrypted off-site backup
+        run: bash ops/backup/backup.sh
+      - name: Restore drill (restore → scratch → verify; non-zero on fail/skip == page)
+        run: bash ops/backup/restore-drill.sh
+      - name: Export round-trip (placeholder — lands with Export, build-order step 8)
+        run: echo "export round-trip re-import test runs here once /platform export exists"

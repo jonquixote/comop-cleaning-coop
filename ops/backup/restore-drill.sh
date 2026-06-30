@@ -4,7 +4,7 @@
 # pages on-call (std §7). Never touches the working DB.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-set -a; source .env; set +a
+if [ -f .env ]; then set -a; source .env; set +a; fi   # CI sets env directly; local sources .env
 
 : "${SUPERUSER_DATABASE_URL:?}"; : "${APP_DATABASE_URL:?}"; : "${APP_PASSWORD:?}"
 : "${BACKUP_PASS:?}"; : "${OFFSITE_REPO:?}"

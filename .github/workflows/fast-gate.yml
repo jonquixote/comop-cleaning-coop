@@ -1,0 +1,56 @@
+name: fast-gate
+
+# Std §2 fast gate — every PR; all must pass to merge.
+on:
+  push:
+  pull_request:
+
+jobs:
+  fast:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_NAME: comop
+      SUPERUSER_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      OWNER_PASSWORD: ciowner
+      APP_PASSWORD: ciapp
+      OWNER_DATABASE_URL: postgresql://app_owner:ciowner@localhost:5432/comop
+      APP_DATABASE_URL: postgresql://app_user:ciapp@localhost:5432/comop
+      SESSION_SECRET: ci-not-secret-please-change-in-real-env
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4          # reads packageManager: pnpm@10 from package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: pnpm install --frozen-lockfile
+      - name: Bootstrap DB + roles
+        run: bash ops/bootstrap.sh
+      - name: Migrate (app_owner)
+        run: pnpm exec tsx ops/migrations/run.ts
+      - name: Seed (co-op A + dormant co-op B)
+        run: pnpm exec tsx ops/seed.ts
+      - name: Typecheck (strict; no any on platform/security/pricing/governance)
+        run: pnpm typecheck
+      - name: Lint + import-ban (ADR-0003)
+        run: pnpm lint
+      - name: Architectural boundaries (ADR-0001 / ADR-0004 §3)
+        run: pnpm boundaries
+      - name: Unit + integration — incl. RLS fail-closed isolation vs seeded co-op B
+        run: pnpm test

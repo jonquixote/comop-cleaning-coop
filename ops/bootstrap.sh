@@ -4,7 +4,7 @@
 # NON-superuser roles (ADR-0004 §4). Reads .env. Migrations run separately (run.ts).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-set -a; source .env; set +a
+if [ -f .env ]; then set -a; source .env; set +a; fi   # CI sets env directly; local sources .env
 
 SUPER="${SUPERUSER_DATABASE_URL:?set SUPERUSER_DATABASE_URL in .env}"
 DB="${DB_NAME:-comop}"

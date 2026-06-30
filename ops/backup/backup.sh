@@ -7,7 +7,7 @@
 # would dump ZERO rows from users/sessions/members.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-set -a; source .env; set +a
+if [ -f .env ]; then set -a; source .env; set +a; fi   # CI sets env directly; local sources .env
 
 : "${SUPERUSER_DATABASE_URL:?}"; : "${DB_NAME:=comop}"
 : "${BACKUP_PASS:?set BACKUP_PASS in .env}"; : "${OFFSITE_REPO:?set OFFSITE_REPO in .env}"
