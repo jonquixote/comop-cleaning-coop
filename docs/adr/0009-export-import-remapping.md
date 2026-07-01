@@ -16,6 +16,8 @@
 
 5. **`jsonb` is opaque.** `breakdown_json` / `value_json` / `transparency_snapshot_json` are frozen denormalized snapshots; internal id copies (e.g. a `policy_version_id` embedded in `breakdown_json`) are historical, not live FKs, and are **not** deep-remapped. All *live* foreign keys are top-level columns and are remapped. The round-trip invariant depends only on top-level data.
 
+6. **`sessions` are excluded.** Sessions are transient auth credentials (server-side login state), not the co-op's data. The charter's exit right mandates machine-readable export of **customers, schedules, and history** — not login tokens. Excluding them also avoids exporting a security credential and sidesteps the global `token_hash` uniqueness (which is not a portable entity key). `schema_migrations` and the ADR-0002 globals are likewise excluded.
+
 ## Consequences
 - Re-import is idempotent, FK-safe, and sector-agnostic — "the system accepts its own output."
 - `verifyRoundTrip` checks the invariant on the export *documents* (row counts, payout surplus sum, per-period allocation conservation, policy-chain resolution) — never on raw ids, which legitimately change.
