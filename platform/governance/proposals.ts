@@ -51,6 +51,13 @@ export async function castVote(
   choice: "yes" | "no" | "abstain",
 ): Promise<void> {
   await requireStatus(tx, coOpId, proposalId, "open");
+  // voter must be an active member OF THIS co-op — rejects cross-tenant members (FK checks
+  // bypass RLS) and probationary members.
+  const eligible = await tx.query(
+    "SELECT 1 FROM members WHERE id = $1 AND co_op_id = $2 AND status = 'member'",
+    [memberId, coOpId],
+  );
+  if (eligible.rowCount === 0) throw new GovernanceError("not an eligible voting member of this co-op");
   const existing = await tx.query("SELECT 1 FROM votes WHERE proposal_id=$1 AND member_id=$2", [proposalId, memberId]);
   if ((existing.rowCount ?? 0) > 0) throw new GovernanceError("member has already voted on this proposal");
   await tx.query(

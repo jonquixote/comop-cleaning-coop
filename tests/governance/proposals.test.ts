@@ -1,10 +1,10 @@
 // Step 7 — proposal lifecycle + voting (TDD, rollback-isolated).
 import { describe, test, expect, afterAll } from "vitest";
-import type { PoolClient } from "pg";
+import { Client, type PoolClient } from "pg";
 import { pool } from "../../platform/db/internal/tenant-tx";
 import { createProposal, openProposal, castVote, closeProposal } from "../../platform/governance/proposals";
 import { GovernanceError } from "../../platform/governance/errors";
-import { COOP_A } from "../../ops/fixtures";
+import { COOP_A, COOP_B } from "../../ops/fixtures";
 
 afterAll(async () => {
   await pool.end();
@@ -74,6 +74,30 @@ describe("proposal lifecycle + voting", () => {
     await withRollback(COOP_A, async (tx) => {
       const { proposalId } = await createProposal(tx, COOP_A, { title: "x" }); // draft
       await expect(closeProposal(tx, COOP_A, proposalId)).rejects.toThrow(GovernanceError);
+    });
+  });
+
+  test("castVote rejects a probationary (non-member) worker", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      const u = await tx.query("INSERT INTO users (co_op_id, role, email) VALUES ($1,'worker','prob@gov') RETURNING id", [COOP_A]);
+      const prob = await tx.query("INSERT INTO members (co_op_id, user_id, status) VALUES ($1,$2,'probationary') RETURNING id", [COOP_A, u.rows[0].id]);
+      const { proposalId } = await createProposal(tx, COOP_A, { title: "x" });
+      await openProposal(tx, COOP_A, proposalId);
+      await expect(castVote(tx, COOP_A, proposalId, prob.rows[0].id as string, "yes")).rejects.toThrow(GovernanceError);
+    });
+  });
+
+  test("castVote rejects a cross-tenant member (co-op B's member)", async () => {
+    const suUrl = (process.env.SUPERUSER_DATABASE_URL ?? "").replace(/\/[^/]*$/, `/${process.env.DB_NAME ?? "comop"}`);
+    const su = new Client({ connectionString: suUrl }); // superuser on the app DB (bypasses RLS) to read co-op B
+    await su.connect();
+    const b = await su.query("SELECT id FROM members WHERE co_op_id=$1 LIMIT 1", [COOP_B]);
+    const bMemberId = b.rows[0].id as string;
+    await su.end();
+    await withRollback(COOP_A, async (tx) => {
+      const { proposalId } = await createProposal(tx, COOP_A, { title: "x" });
+      await openProposal(tx, COOP_A, proposalId);
+      await expect(castVote(tx, COOP_A, proposalId, bMemberId, "yes")).rejects.toThrow(GovernanceError);
     });
   });
 });

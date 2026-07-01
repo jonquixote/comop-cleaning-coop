@@ -23,7 +23,7 @@ const applied = new Set(
   (await client.query("SELECT filename FROM schema_migrations")).rows.map((r) => r.filename as string),
 );
 
-const files = readdirSync(here).filter((f) => /^\d+_.*\.sql$/.test(f)).sort();
+const files = readdirSync(here).filter((f) => /^\d+[a-z]?_.*\.sql$/.test(f)).sort();
 let count = 0;
 for (const file of files) {
   if (applied.has(file)) { console.log(`skip    ${file}`); continue; }

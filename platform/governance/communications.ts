@@ -17,16 +17,22 @@ export async function createCommunication(
   coOpId: string,
   input: CreateCommunicationInput,
 ): Promise<{ communicationId: string }> {
-  if (input.mode === "decision") {
-    if (!input.proposalId) {
-      throw new GovernanceError("decision-mode communication requires a linked proposal");
-    }
+  // Any linked proposal must belong to THIS co-op — enforced in EVERY mode, so a routine
+  // comm cannot silently link a cross-tenant proposal (FK checks bypass RLS).
+  let linked: { transparency_snapshot_json: unknown } | undefined;
+  if (input.proposalId) {
     const p = await tx.query(
       "SELECT transparency_snapshot_json FROM proposals WHERE id = $1 AND co_op_id = $2",
       [input.proposalId, coOpId],
     );
     if (p.rowCount === 0) throw new GovernanceError("linked proposal not found");
-    if (p.rows[0].transparency_snapshot_json == null) {
+    linked = p.rows[0];
+  }
+  if (input.mode === "decision") {
+    if (!linked) {
+      throw new GovernanceError("decision-mode communication requires a linked proposal");
+    }
+    if (linked.transparency_snapshot_json == null) {
       throw new GovernanceError("decision-mode communication requires the proposal to carry computable economics");
     }
   }

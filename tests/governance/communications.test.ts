@@ -65,4 +65,12 @@ describe("valve write-constraint — decision-mode economics", () => {
       ).rejects.toThrow(/computable economics|transparency_snapshot/i);
     });
   });
+
+  test("routine comm rejects a foreign / cross-tenant proposalId (tenant-scoped in every mode)", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      await expect(
+        createCommunication(tx, COOP_A, { mode: "routine", proposalId: "00000000-0000-0000-0000-0000000000ff", body: "notice" }),
+      ).rejects.toThrow(GovernanceError);
+    });
+  });
 });
