@@ -1,5 +1,5 @@
-// Step 7 — the valve: surplus_split changes ONLY via a passed proposal (TDD). Closes the
-// loop with Step 2's snapshot — the new policy_settings row carries set_by_proposal_id.
+// Step 7 — the valve: surplus_split changes ONLY via a passed surplus_split proposal, once,
+// with a valid fraction (TDD + Step-7 authz hardening). New policy row carries set_by_proposal_id.
 import { describe, test, expect, afterAll } from "vitest";
 import type { PoolClient } from "pg";
 import { pool } from "../../platform/db/internal/tenant-tx";
@@ -25,10 +25,12 @@ async function withRollback(coOpId: string, fn: (tx: PoolClient) => Promise<void
   }
 }
 
-async function passedProposal(tx: PoolClient): Promise<string> {
-  const u = await tx.query("INSERT INTO users (co_op_id, role, email) VALUES ($1,'worker','vv@valve') RETURNING id", [COOP_A]);
+let memberSeq = 0;
+async function passedProposal(tx: PoolClient, type = "surplus_split"): Promise<string> {
+  const email = `vv-${memberSeq++}@valve`;
+  const u = await tx.query("INSERT INTO users (co_op_id, role, email) VALUES ($1,'worker',$2) RETURNING id", [COOP_A, email]);
   const m = await tx.query("INSERT INTO members (co_op_id, user_id, status) VALUES ($1,$2,'member') RETURNING id", [COOP_A, u.rows[0].id]);
-  const { proposalId } = await createProposal(tx, COOP_A, { title: "Set split", type: "surplus_split" });
+  const { proposalId } = await createProposal(tx, COOP_A, { title: "Set split", type });
   await openProposal(tx, COOP_A, proposalId);
   await castVote(tx, COOP_A, proposalId, m.rows[0].id as string, "yes");
   await closeProposal(tx, COOP_A, proposalId); // yes=1,no=0 → passed
@@ -38,8 +40,31 @@ async function passedProposal(tx: PoolClient): Promise<string> {
 describe("valve — surplus_split set only by a passed proposal", () => {
   test("rejects setting the split on a non-passed proposal", async () => {
     await withRollback(COOP_A, async (tx) => {
-      const { proposalId } = await createProposal(tx, COOP_A, { title: "x" }); // draft
+      const { proposalId } = await createProposal(tx, COOP_A, { title: "x", type: "surplus_split" }); // draft
       await expect(setSurplusSplitByProposal(tx, COOP_A, proposalId, 0.3)).rejects.toThrow(GovernanceError);
+    });
+  });
+
+  test("rejects a proposal whose type is not surplus_split", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      const proposalId = await passedProposal(tx, "expenditure"); // passed, WRONG type
+      await expect(setSurplusSplitByProposal(tx, COOP_A, proposalId, 0.3)).rejects.toThrow(GovernanceError);
+    });
+  });
+
+  test("rejects a fraction outside [0,1]", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      const proposalId = await passedProposal(tx);
+      await expect(setSurplusSplitByProposal(tx, COOP_A, proposalId, 1.5)).rejects.toThrow(GovernanceError);
+      await expect(setSurplusSplitByProposal(tx, COOP_A, proposalId, -0.1)).rejects.toThrow(GovernanceError);
+    });
+  });
+
+  test("rejects reuse — a passed proposal sets the split only once", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      const proposalId = await passedProposal(tx);
+      await setSurplusSplitByProposal(tx, COOP_A, proposalId, 0.3);
+      await expect(setSurplusSplitByProposal(tx, COOP_A, proposalId, 0.4)).rejects.toThrow(GovernanceError);
     });
   });
 

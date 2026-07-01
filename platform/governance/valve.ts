@@ -11,10 +11,21 @@ export async function setSurplusSplitByProposal(
   proposalId: string,
   fraction: number,
 ): Promise<{ policyVersionId: string }> {
-  const p = await tx.query("SELECT status FROM proposals WHERE id = $1 AND co_op_id = $2", [proposalId, coOpId]);
+  if (!(fraction >= 0 && fraction <= 1)) {
+    throw new GovernanceError("surplus_split fraction must be between 0 and 1");
+  }
+  const p = await tx.query("SELECT status, type FROM proposals WHERE id = $1 AND co_op_id = $2", [proposalId, coOpId]);
   if (p.rowCount === 0) throw new GovernanceError("proposal not found");
+  if (p.rows[0].type !== "surplus_split") {
+    throw new GovernanceError("proposal is not a surplus_split proposal");
+  }
   if (p.rows[0].status !== "passed") {
     throw new GovernanceError("surplus_split can only be set by a PASSED proposal");
+  }
+  // one passed proposal sets the split EXACTLY once (app check + UNIQUE(set_by_proposal_id) backstop)
+  const already = await tx.query("SELECT 1 FROM policy_settings WHERE set_by_proposal_id = $1", [proposalId]);
+  if ((already.rowCount ?? 0) > 0) {
+    throw new GovernanceError("this proposal has already set the surplus_split");
   }
   const r = await tx.query(
     `INSERT INTO policy_settings (co_op_id, key, value_json, effective_from, set_by_proposal_id)
