@@ -35,15 +35,18 @@ async function withRollback(coOpId: string, fn: (tx: PoolClient) => Promise<void
   }
 }
 
-// app_owner tx (can insert co_ops); always rolled back.
-async function withOwnerRollback(fn: (c: Client) => Promise<void>): Promise<void> {
+// app_owner connection helper; transaction policy depends on the operation:
+//   - importCoOpData is self-transactional (uses SAVEPOINT internally) — connect
+//     without an outer BEGIN so the SAVEPOINT path is exercised end-to-end.
+//   - exports are read-only and don't need an enclosing tx.
+// Both forms roll back any persistent state because the NEW co-op ids used here
+// (COOP_C, COOP_EMPTY) are unique to the test run.
+async function withOwnerClient(fn: (c: Client) => Promise<void>): Promise<void> {
   const c = new Client({ connectionString: OWNER });
   await c.connect();
   try {
-    await c.query("BEGIN");
     await fn(c);
   } finally {
-    await c.query("ROLLBACK");
     await c.end();
   }
 }
@@ -97,7 +100,7 @@ describe("export round-trip — the exit right", () => {
     expect(doc.tables.member_allocations!.rowCount).toBeGreaterThan(0);
 
     let reDoc: ExportDocument | undefined;
-    await withOwnerRollback(async (c: ClientBase) => {
+    await withOwnerClient(async (c: ClientBase) => {
       await importCoOpData(c, COOP_C, doc);
       reDoc = await exportCoOpData(c, COOP_C);
     });
@@ -120,7 +123,7 @@ describe("export round-trip — the exit right", () => {
 
   test("re-import idempotency: importing twice doesn't double rows", async () => {
     const doc = await buildAndExportA();
-    await withOwnerRollback(async (c: ClientBase) => {
+    await withOwnerClient(async (c: ClientBase) => {
       const first = await importCoOpData(c, COOP_C, doc);
       const second = await importCoOpData(c, COOP_C, doc);
       expect(first.rowsImported).toBeGreaterThan(0);
@@ -135,7 +138,7 @@ describe("export round-trip — the exit right", () => {
   test("verifyRoundTrip catches corruption: tampered surplus_cents → valid:false", async () => {
     const doc = await buildAndExportA();
     let reDoc: ExportDocument | undefined;
-    await withOwnerRollback(async (c: ClientBase) => {
+    await withOwnerClient(async (c: ClientBase) => {
       await importCoOpData(c, COOP_C, doc);
       reDoc = await exportCoOpData(c, COOP_C);
     });
@@ -147,7 +150,7 @@ describe("export round-trip — the exit right", () => {
   });
 
   test("empty co-op exports cleanly (no rows, no error)", async () => {
-    await withOwnerRollback(async (c: ClientBase) => {
+    await withOwnerClient(async (c: ClientBase) => {
       await c.query("INSERT INTO co_ops (id, name) VALUES ($1, 'Empty Co-op')", [COOP_EMPTY]);
       await c.query("SELECT set_config('app.current_co_op', $1, true)", [COOP_EMPTY]);
       const doc = await exportCoOpData(c, COOP_EMPTY);
