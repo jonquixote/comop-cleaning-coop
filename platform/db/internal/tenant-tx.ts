@@ -5,7 +5,11 @@
 import { Pool, type PoolClient } from "pg";
 
 // The pool connects AS app_user (APP_DATABASE_URL): non-superuser, never BYPASSRLS.
-export const pool = new Pool({ connectionString: process.env.APP_DATABASE_URL });
+// SSL is configured to accept self-signed certs from managed DBs (UpCloud/Aiven).
+export const pool = new Pool({
+  connectionString: process.env.APP_DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
 /**
  * Runs `fn` inside a transaction whose tenant context is set to `coOpId`.

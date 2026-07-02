@@ -14,8 +14,8 @@ if (!ownerUrl) throw new Error("OWNER_DATABASE_URL is not set (see .env.example)
 const owner = new Client({ connectionString: ownerUrl });
 await owner.connect();
 await owner.query(
-  "INSERT INTO co_ops (id, name) VALUES ($1,$2),($3,$4) ON CONFLICT (id) DO NOTHING",
-  [COOP_A, COOP_A_NAME, COOP_B, COOP_B_NAME],
+  "INSERT INTO co_ops (id, name, slug) VALUES ($1,$2,$3),($4,$5,$6) ON CONFLICT (id) DO NOTHING",
+  [COOP_A, COOP_A_NAME, "coop-a", COOP_B, COOP_B_NAME, "coop-b"],
 );
 await owner.end();
 
@@ -40,5 +40,14 @@ async function seedCoOp(coOpId: string, email: string, role: string): Promise<vo
 
 await seedCoOp(COOP_A, "a-admin@example.test", "admin");
 await seedCoOp(COOP_B, "b-worker@example.test", "worker");
+
+await withTenantTx(COOP_A, async (tx) => {
+  await tx.query(
+    `INSERT INTO policy_settings (co_op_id, key, value_json) VALUES ($1, 'surplus_split', '{"fraction":0.2}')
+     ON CONFLICT DO NOTHING`,
+    [COOP_A],
+  );
+});
+
 await pool.end();
 console.log("seed ok: co-op A (active) + co-op B (dormant isolation fixture)");

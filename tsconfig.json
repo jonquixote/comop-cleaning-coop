@@ -3,7 +3,14 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022"],
+    "baseUrl": ".",
+    "paths": {
+      "@comop/platform/*": ["platform/*"],
+      "@comop/cleaning/*": ["sectors/cleaning/*"],
+      "@comop/customer-web/*": ["apps/customer-web/src/*"]
+    },
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "types": ["node"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
