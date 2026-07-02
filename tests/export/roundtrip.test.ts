@@ -104,7 +104,8 @@ describe("export round-trip — the exit right", () => {
       await importCoOpData(c, COOP_C, doc);
       // importCoOpData commits its transaction, losing the transaction-scoped
       // app.current_co_op. Restore it so FORCE RLS on SELECT doesn't filter out rows.
-      await c.query("SELECT set_config('app.current_co_op', $1, true)", [COOP_C]);
+      // is_local=false: session-scoped, since we may not be in a transaction here.
+      await c.query("SELECT set_config('app.current_co_op', $1, false)", [COOP_C]);
       reDoc = await exportCoOpData(c, COOP_C);
     });
 
@@ -131,7 +132,7 @@ describe("export round-trip — the exit right", () => {
       const second = await importCoOpData(c, COOP_C, doc);
       expect(first.rowsImported).toBeGreaterThan(0);
       expect(second.rowsImported).toBe(0); // deterministic ids + ON CONFLICT DO NOTHING
-      await c.query("SELECT set_config('app.current_co_op', $1, true)", [COOP_C]);
+      await c.query("SELECT set_config('app.current_co_op', $1, false)", [COOP_C]);
       const reDoc = await exportCoOpData(c, COOP_C);
       for (const t of Object.keys(doc.tables)) {
         expect(reDoc.tables[t]?.rowCount ?? 0).toBe(doc.tables[t]!.rowCount);
@@ -144,7 +145,7 @@ describe("export round-trip — the exit right", () => {
     let reDoc: ExportDocument | undefined;
     await withOwnerClient(async (c: ClientBase) => {
       await importCoOpData(c, COOP_C, doc);
-      await c.query("SELECT set_config('app.current_co_op', $1, true)", [COOP_C]);
+      await c.query("SELECT set_config('app.current_co_op', $1, false)", [COOP_C]);
       reDoc = await exportCoOpData(c, COOP_C);
     });
     const first = reDoc!.tables.payout_ledger!.rows[0]!;
@@ -157,7 +158,7 @@ describe("export round-trip — the exit right", () => {
   test("empty co-op exports cleanly (no rows, no error)", async () => {
     await withOwnerClient(async (c: ClientBase) => {
       await c.query("INSERT INTO co_ops (id, name) VALUES ($1, 'Empty Co-op')", [COOP_EMPTY]);
-      await c.query("SELECT set_config('app.current_co_op', $1, true)", [COOP_EMPTY]);
+      await c.query("SELECT set_config('app.current_co_op', $1, false)", [COOP_EMPTY]);
       const doc = await exportCoOpData(c, COOP_EMPTY);
       expect(doc.coOpId).toBe(COOP_EMPTY);
       expect(doc.tables.co_ops!.rowCount).toBe(1);

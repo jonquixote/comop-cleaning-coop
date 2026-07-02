@@ -29,17 +29,18 @@ function deterministicUuid(namespace: string, name: string): string {
 
 // A `ClientBase` does not expose the active state — detect via a SAVEPOINT probe. We
 // pick the cheapest possible probe: issuing a SAVEPOINT inside an existing tx is fine;
-// issuing it outside an active tx errors with "SAVEPOINT can only be used in transaction
-// blocks" (Postgres — no sqlstate stable, so we string-match the message).
+// issuing it outside an active tx errors with SQLSTATE 25P01 (nosqlstate 0A000
+// is not guaranteed stable, so we also match the standard message).
 async function hasOpenTx(client: ClientBase): Promise<boolean> {
   try {
     await client.query(`SAVEPOINT __probe__`);
     await client.query(`RELEASE SAVEPOINT __probe__`);
     return true;
-  } catch (e) {
+  } catch (e: unknown) {
+    const code = (e as { code?: string }).code;
+    if (code === "25P01") return false;
     const msg = (e as Error).message ?? "";
     if (/SAVEPOINT can only be used in transaction blocks/i.test(msg)) return false;
-    if (/no active transaction|25P01/i.test(msg)) return false;
     throw e; // unexpected error — propagate
   }
 }
