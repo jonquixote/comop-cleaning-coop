@@ -125,9 +125,13 @@ async function runImport(
   let total = 0;
 
   // co_ops first (anchor; inserted without a tenant context — co_ops is not FORCE-RLS).
+  // Null out slug — it is a UNIQUE user-facing label that would conflict if the source
+  // co-op already owns it (e.g. every export of "Co-op A" carries slug="coop-a"). The
+  // imported co-op can set its own slug later.
   for (const t of tableNames) {
     if (t !== "co_ops") continue;
     for (const row of doc.tables[t]!.rows) {
+      row.slug = null;
       total++;
       imported += await insertRow(t, doc.tables[t]!, row);
     }
