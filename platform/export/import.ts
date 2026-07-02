@@ -115,7 +115,7 @@ async function runImport(
     const r = await client.query(
       `INSERT INTO "${table}" (${cols.map((c) => `"${c}"`).join(", ")})
        VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")})
-       ON CONFLICT (id) DO NOTHING`,
+        ON CONFLICT DO NOTHING`,
       values,
     );
     return r.rowCount ?? 0;

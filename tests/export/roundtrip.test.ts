@@ -17,6 +17,8 @@ import { COOP_A, COOP_B } from "../../ops/fixtures";
 
 const OWNER = process.env.OWNER_DATABASE_URL ?? "";
 const COOP_C = "00000000-0000-0000-0000-00000000000c";
+const COOP_D = "00000000-0000-0000-0000-00000000000d";
+const COOP_F = "00000000-0000-0000-0000-00000000000f";
 const COOP_EMPTY = "00000000-0000-0000-0000-00000000000e";
 
 afterAll(async () => {
@@ -40,7 +42,7 @@ async function withRollback(coOpId: string, fn: (tx: PoolClient) => Promise<void
 //     without an outer BEGIN so the SAVEPOINT path is exercised end-to-end.
 //   - exports are read-only and don't need an enclosing tx.
 // Both forms roll back any persistent state because the NEW co-op ids used here
-// (COOP_C, COOP_EMPTY) are unique to the test run.
+// (COOP_C, COOP_D, COOP_F, COOP_EMPTY) are unique to the test run.
 async function withOwnerClient(fn: (c: Client) => Promise<void>): Promise<void> {
   const c = new Client({ connectionString: OWNER });
   await c.connect();
@@ -128,12 +130,12 @@ describe("export round-trip — the exit right", () => {
   test("re-import idempotency: importing twice doesn't double rows", async () => {
     const doc = await buildAndExportA();
     await withOwnerClient(async (c: ClientBase) => {
-      const first = await importCoOpData(c, COOP_C, doc);
-      const second = await importCoOpData(c, COOP_C, doc);
+      const first = await importCoOpData(c, COOP_D, doc);
+      const second = await importCoOpData(c, COOP_D, doc);
       expect(first.rowsImported).toBeGreaterThan(0);
       expect(second.rowsImported).toBe(0); // deterministic ids + ON CONFLICT DO NOTHING
-      await c.query("SELECT set_config('app.current_co_op', $1, false)", [COOP_C]);
-      const reDoc = await exportCoOpData(c, COOP_C);
+      await c.query("SELECT set_config('app.current_co_op', $1, false)", [COOP_D]);
+      const reDoc = await exportCoOpData(c, COOP_D);
       for (const t of Object.keys(doc.tables)) {
         expect(reDoc.tables[t]?.rowCount ?? 0).toBe(doc.tables[t]!.rowCount);
       }
@@ -144,9 +146,9 @@ describe("export round-trip — the exit right", () => {
     const doc = await buildAndExportA();
     let reDoc: ExportDocument | undefined;
     await withOwnerClient(async (c: ClientBase) => {
-      await importCoOpData(c, COOP_C, doc);
-      await c.query("SELECT set_config('app.current_co_op', $1, false)", [COOP_C]);
-      reDoc = await exportCoOpData(c, COOP_C);
+      await importCoOpData(c, COOP_F, doc);
+      await c.query("SELECT set_config('app.current_co_op', $1, false)", [COOP_F]);
+      reDoc = await exportCoOpData(c, COOP_F);
     });
     const first = reDoc!.tables.payout_ledger!.rows[0]!;
     first.surplus_cents = Number(first.surplus_cents) + 999; // tamper
