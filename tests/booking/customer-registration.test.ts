@@ -42,8 +42,8 @@ describe("registration + login + logout", () => {
       expect(r.rows[0].email).toBe(testEmail);
 
       const userId = r.rows[0].id as string;
-      const { token } = await createSession(userId, COOP_A);
-      const session = await resolveSession(token);
+      const { token } = await createSession(userId, COOP_A, 24 * 14, tx);
+      const session = await resolveSession(token, tx);
       expect(session?.userId).toBe(userId);
       expect(session?.coOpId).toBe(COOP_A);
     });
@@ -78,11 +78,11 @@ describe("registration + login + logout", () => {
         [COOP_A, "logout-test@example.test", passwordHash],
       );
       const userId = u.rows[0].id as string;
-      const { token } = await createSession(userId, COOP_A);
+      const { token } = await createSession(userId, COOP_A, 24 * 14, tx);
 
-      expect(await resolveSession(token)).not.toBeNull();
-      await revokeSession(token);
-      expect(await resolveSession(token)).toBeNull();
+      expect(await resolveSession(token, tx)).not.toBeNull();
+      await revokeSession(token, tx);
+      expect(await resolveSession(token, tx)).toBeNull();
     });
   });
 });

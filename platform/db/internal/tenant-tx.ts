@@ -5,10 +5,19 @@
 import { Pool, type PoolClient } from "pg";
 
 // The pool connects AS app_user (APP_DATABASE_URL): non-superuser, never BYPASSRLS.
-// SSL is configured to accept self-signed certs from managed DBs (UpCloud/Aiven).
+// SSL with rejectUnauthorized: false is for managed DBs (UpCloud/Aiven) that present
+// self-signed cert chains. Local dev (localhost/127.0.0.1) does not use SSL.
+const appUrl = process.env.APP_DATABASE_URL ?? "";
+const ssl = (() => {
+  try {
+    const u = new URL(appUrl);
+    if (["localhost", "127.0.0.1", "::1"].includes(u.hostname)) return undefined;
+  } catch { /* fall through */ }
+  return { rejectUnauthorized: false };
+})();
 export const pool = new Pool({
-  connectionString: process.env.APP_DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  connectionString: appUrl,
+  ...(ssl ? { ssl } : {}),
 });
 
 /**

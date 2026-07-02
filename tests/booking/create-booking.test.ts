@@ -167,14 +167,14 @@ describe("booking.create with session (withSessionTx door)", () => {
         [COOP_A],
       );
 
-      const { token } = await createSession(userId, COOP_A);
+      const { token } = await createSession(userId, COOP_A, 24 * 14, tx);
 
       const bookedJobId = await withSessionTx(token, async (tx2, ctx) => {
         expect(ctx.coOpId).toBe(COOP_A);
         const details: CleaningJobDetails = { sqft: 900, bedrooms: 1, bathrooms: 1, addons: [] };
         const result = await createCleaningBooking(tx2, ctx.coOpId, { customerId, details });
         return result.jobId;
-      });
+      }, tx);
 
       const job = await tx.query("SELECT id, co_op_id FROM jobs WHERE id = $1", [bookedJobId]);
       expect(job.rows[0].co_op_id).toBe(COOP_A);

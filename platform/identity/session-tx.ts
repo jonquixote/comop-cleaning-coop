@@ -7,11 +7,17 @@ import type { PoolClient } from "pg";
 import { withTenantTx } from "../db/internal/tenant-tx";
 import { resolveSession, type SessionContext } from "./session";
 
+/** Pre-auth tenant transaction: resolves the session, then runs fn in tenant context.
+ *  Accepts an optional existing transaction (`existingTx`) for composability in tests
+ *  that already hold a tenant-scoped connection. When omitted, opens its own transaction
+ *  via withTenantTx (the production path). */
 export async function withSessionTx<T>(
   token: string,
   fn: (tx: PoolClient, ctx: SessionContext) => Promise<T>,
+  existingTx?: PoolClient,
 ): Promise<T> {
-  const ctx = await resolveSession(token);
+  const ctx = await resolveSession(token, existingTx);
   if (!ctx) throw new Error("no valid session");
+  if (existingTx) return fn(existingTx, ctx);
   return withTenantTx(ctx.coOpId, (tx) => fn(tx, ctx));
 }

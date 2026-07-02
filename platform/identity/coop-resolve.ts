@@ -5,9 +5,19 @@ import { Pool } from "pg";
 import { withTenantTx } from "../db/internal/tenant-tx";
 import type { PoolClient } from "pg";
 
+// Owner pool uses the same SSL logic as the app pool: localhost doesn't need it,
+// remote managed DBs (UpCloud/Aiven) require it.
+const ownerUrl = process.env.OWNER_DATABASE_URL ?? "";
+const ssl = (() => {
+  try {
+    const u = new URL(ownerUrl);
+    if (["localhost", "127.0.0.1", "::1"].includes(u.hostname)) return undefined;
+  } catch { /* fall through */ }
+  return { rejectUnauthorized: false };
+})();
 const ownerPool = new Pool({
-  connectionString: process.env.OWNER_DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  connectionString: ownerUrl,
+  ...(ssl ? { ssl } : {}),
 });
 
 export async function resolveCoOpIdBySlug(slug: string): Promise<string> {
