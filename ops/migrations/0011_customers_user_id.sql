@@ -8,6 +8,13 @@ ALTER TABLE co_ops ADD COLUMN slug text UNIQUE;
 ALTER TABLE customers ADD COLUMN user_id uuid REFERENCES users(id);
 CREATE INDEX ON customers (co_op_id, user_id);
 
+-- Ensure genesis co-ops exist (idempotent via ON CONFLICT). CI databases run all
+-- migrations sequentially and may not have seeds applied yet.
+INSERT INTO co_ops (id, name) VALUES
+  ('00000000-0000-0000-0000-00000000000a', 'Co-op A'),
+  ('00000000-0000-0000-0000-00000000000b', 'Co-op B')
+ON CONFLICT (id) DO NOTHING;
+
 -- Genesis slug for existing co-ops (idempotent on re-run since slug is nullable).
 UPDATE co_ops SET slug = 'coop-a' WHERE id = '00000000-0000-0000-0000-00000000000a';
 UPDATE co_ops SET slug = 'coop-b' WHERE id = '00000000-0000-0000-0000-00000000000b';
