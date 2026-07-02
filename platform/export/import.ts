@@ -128,6 +128,16 @@ async function runImport(
   const insertRow = async (table: string, tdef: ExportTable, row: Record<string, unknown>): Promise<number> => {
     const cols = Object.keys(row);
     const values = cols.map((c) => remapForColumn(row[c], table, c));
+    // DEBUG: log remap for users and members inserts
+    if (table === "members") {
+      const midx = cols.indexOf("user_id");
+      process.stderr.write(`[import-debug] INSERT members user_id=${midx >= 0 ? values[midx] : "N/A"} (orig=${row.user_id})\n`);
+    }
+    if (table === "users") {
+      const iidx = cols.indexOf("id");
+      const eidx = cols.indexOf("email");
+      process.stderr.write(`[import-debug] INSERT users id=${iidx >= 0 ? values[iidx] : "N/A"} email=${eidx >= 0 ? values[eidx] : "N/A"} (orig.id=${row.id})\n`);
+    }
     const r = await client.query(
       `INSERT INTO "${table}" (${cols.map((c) => `"${c}"`).join(", ")})
        VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")})
