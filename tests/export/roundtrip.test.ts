@@ -102,6 +102,9 @@ describe("export round-trip — the exit right", () => {
     let reDoc: ExportDocument | undefined;
     await withOwnerClient(async (c: ClientBase) => {
       await importCoOpData(c, COOP_C, doc);
+      // importCoOpData commits its transaction, losing the transaction-scoped
+      // app.current_co_op. Restore it so FORCE RLS on SELECT doesn't filter out rows.
+      await c.query("SELECT set_config('app.current_co_op', $1, true)", [COOP_C]);
       reDoc = await exportCoOpData(c, COOP_C);
     });
 
@@ -128,6 +131,7 @@ describe("export round-trip — the exit right", () => {
       const second = await importCoOpData(c, COOP_C, doc);
       expect(first.rowsImported).toBeGreaterThan(0);
       expect(second.rowsImported).toBe(0); // deterministic ids + ON CONFLICT DO NOTHING
+      await c.query("SELECT set_config('app.current_co_op', $1, true)", [COOP_C]);
       const reDoc = await exportCoOpData(c, COOP_C);
       for (const t of Object.keys(doc.tables)) {
         expect(reDoc.tables[t]?.rowCount ?? 0).toBe(doc.tables[t]!.rowCount);
@@ -140,6 +144,7 @@ describe("export round-trip — the exit right", () => {
     let reDoc: ExportDocument | undefined;
     await withOwnerClient(async (c: ClientBase) => {
       await importCoOpData(c, COOP_C, doc);
+      await c.query("SELECT set_config('app.current_co_op', $1, true)", [COOP_C]);
       reDoc = await exportCoOpData(c, COOP_C);
     });
     const first = reDoc!.tables.payout_ledger!.rows[0]!;
