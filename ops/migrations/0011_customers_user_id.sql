@@ -14,9 +14,12 @@ UPDATE co_ops SET slug = 'coop-b' WHERE id = '00000000-0000-0000-0000-0000000000
 
 -- Genesis surplus_split policy for co-op A (required by createCleaningBooking).
 -- Without this, resolveCurrentPolicySnapshot throws "no surplus_split policy set".
+-- Temporarily disable RLS to allow the genesis insert during migration as app_owner.
+ALTER TABLE policy_settings DISABLE ROW LEVEL SECURITY;
 INSERT INTO policy_settings (co_op_id, key, value_json)
 SELECT '00000000-0000-0000-0000-00000000000a', 'surplus_split', '{"fraction":0.2}'
 WHERE NOT EXISTS (
   SELECT 1 FROM policy_settings
   WHERE co_op_id = '00000000-0000-0000-0000-00000000000a' AND key = 'surplus_split'
 );
+ALTER TABLE policy_settings ENABLE ROW LEVEL SECURITY;
