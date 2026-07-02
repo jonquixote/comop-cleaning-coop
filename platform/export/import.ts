@@ -74,22 +74,6 @@ async function runImport(
   const map = new Map<string, string>();
   map.set(doc.coOpId, newCoOpId); // the co-op id + every co_op_id reference → newCoOpId
 
-  // DEBUG: log table order and first user row
-  const tableNames = Object.keys(doc.tables);
-  const hasUsers = tableNames.includes("users");
-  const userCt = hasUsers ? doc.tables.users!.rows.length : 0;
-  const hasMembers = tableNames.includes("members");
-  const memberCt = hasMembers ? doc.tables.members!.rows.length : 0;
-  process.stderr.write(`[import-debug] coOpId=${newCoOpId} tables=[${tableNames.join(",")}] usersRows=${userCt} membersRows=${memberCt}\n`);
-  if (hasUsers && userCt > 0) {
-    const u = doc.tables.users!.rows[0]!;
-    process.stderr.write(`[import-debug] first user row: id=${u.id} co_op_id=${u.co_op_id} email=${u.email}\n`);
-  }
-  if (hasMembers && memberCt > 0) {
-    const m = doc.tables.members!.rows[0]!;
-    process.stderr.write(`[import-debug] first member row: id=${m.id} co_op_id=${m.co_op_id} user_id=${m.user_id}\n`);
-  }
-
   const warnings: string[] = [];
 
   /** Apply remap to value `v` only when its column is uuid-typed per the table's
@@ -128,26 +112,17 @@ async function runImport(
   const insertRow = async (table: string, tdef: ExportTable, row: Record<string, unknown>): Promise<number> => {
     const cols = Object.keys(row);
     const values = cols.map((c) => remapForColumn(row[c], table, c));
-    // DEBUG: log remap for users and members inserts
-    if (table === "members") {
-      const midx = cols.indexOf("user_id");
-      process.stderr.write(`[import-debug] INSERT members user_id=${midx >= 0 ? values[midx] : "N/A"} (orig=${row.user_id})\n`);
-    }
-    if (table === "users") {
-      const iidx = cols.indexOf("id");
-      const eidx = cols.indexOf("email");
-      process.stderr.write(`[import-debug] INSERT users id=${iidx >= 0 ? values[iidx] : "N/A"} email=${eidx >= 0 ? values[eidx] : "N/A"} (orig.id=${row.id})\n`);
-    }
     const r = await client.query(
       `INSERT INTO "${table}" (${cols.map((c) => `"${c}"`).join(", ")})
        VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")})
-       ON CONFLICT DO NOTHING`,
+       ON CONFLICT (id) DO NOTHING`,
       values,
     );
     return r.rowCount ?? 0;
   };
 
-  // tableNames already declared above (debug section)
+  // tableNames preserves the export's FK-safe order
+  const tableNames = Object.keys(doc.tables);
   let imported = 0;
   let total = 0;
 
