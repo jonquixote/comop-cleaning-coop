@@ -42,7 +42,22 @@ export async function assignJob(
     throw new DispatchError("requested shift conflicts with an existing assignment");
   }
 
-  // 3. assign
+  // 3. compliance gate — no expired/missing credentials (A4, spec §4 compliance_records
+  //    powers dispatch blocking per spec §7 step 4 "Compliance, minimal but real").
+  //    Status='valid' OR no compliance row at all = OK. status='expired' or 'missing'
+  //    blocks assignment.
+  const bad = await tx.query(
+    `SELECT 1 FROM compliance_records
+      WHERE member_id = $1 AND co_op_id = $2
+        AND status IN ('expired','missing')
+      LIMIT 1`,
+    [req.memberId, coOpId],
+  );
+  if ((bad.rowCount ?? 0) > 0) {
+    throw new DispatchError("member has expired or missing compliance requirements");
+  }
+
+  // 4. assign
   const r = await tx.query(
     `INSERT INTO job_assignments (co_op_id, job_id, member_id, starts_at, ends_at)
      VALUES ($1, $2, $3, $4, $5) RETURNING id`,
