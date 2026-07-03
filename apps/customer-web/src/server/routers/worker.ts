@@ -38,14 +38,6 @@ export interface GetJobRow {
   customerAddress: string | null;
 }
 
-interface ChecklistTaskJson {
-  description: string;
-  optional: boolean;
-  completed?: boolean;
-  completed_by_member_id?: string | null;
-  completed_at?: string | null;
-}
-
 export const workerRouter = router({
   workerJobs: authedProcedure.query(async ({ ctx }) =>
     withSessionTx(ctx.token, async (tx, sessionCtx) => {
