@@ -45,13 +45,22 @@ GRANT SELECT, INSERT, UPDATE ON payments TO app_user;
 -- Backfill: create payments rows for every job that was already paid before this migration.
 -- stripe_payment_intent_id is prefixed 'backfill-' for historical rows;
 -- these are NOT real Stripe IDs. Do not use them in Stripe API calls.
+-- Idempotent on re-run (v8 review Issue C): the payments table has NO unique constraint
+-- to conflict against, so a plain ON CONFLICT DO NOTHING is a silent no-op and a re-run
+-- inserts duplicates. WHERE NOT EXISTS guards on the (co_op_id, job_id) pair we expect
+-- to have backfilled for — exactly one payments row per existing paid job.
 INSERT INTO payments (co_op_id, job_id, customer_id, amount_cents,
                       stripe_payment_intent_id, status, paid_at)
 SELECT co_op_id, id, customer_id, final_price_cents,
        'backfill-' || id, 'succeeded', COALESCE(updated_at, created_at)
 FROM jobs
-WHERE status = 'paid' AND final_price_cents IS NOT NULL
-ON CONFLICT DO NOTHING;
+WHERE status = 'paid'
+  AND final_price_cents IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM payments
+    WHERE payments.co_op_id = jobs.co_op_id
+      AND payments.job_id     = jobs.id
+  );
 
 CREATE OR REPLACE FUNCTION set_payments_updated_at() RETURNS trigger AS $$
 BEGIN NEW.updated_at = now(); RETURN NEW;

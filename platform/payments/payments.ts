@@ -51,21 +51,10 @@ export async function getPaymentsForCustomer(
   return r.rows.map(mapPayment);
 }
 
-export async function recordRefund(
-  tx: PoolClient,
-  coOpId: string,
-  paymentId: string,
-  amountCents: number,
-  reason: string,
-): Promise<void> {
-  await tx.query(
-    `UPDATE payments
-        SET status = 'refunded', refund_amount_cents = $3,
-            refunded_at = now(), failure_reason = $4
-      WHERE id = $1 AND co_op_id = $2`,
-    [paymentId, coOpId, amountCents, reason],
-  );
-}
+// RecordRefund moved to platform/payments/refund.ts — v8 review Issue A (idempotency):
+// the old implementation UPDATEd the payments row, allowing silent double-refund
+// overwrites. Replaced with an append-only refund_ledger table with UNIQUE(payment_id)
+// so retries are no-ops and return { recorded: false }.
 
 interface PaymentRow {
   id: string;
