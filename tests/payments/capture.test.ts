@@ -61,6 +61,36 @@ describe("capturePayment — capture + idempotency + guards", () => {
     });
   });
 
+  test("captures: persists stripeChargeId on jobs and payments when provided (Issue B)", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      const { jobId } = await setupDoneJob(tx);
+      const r = await capturePayment(tx, COOP_A, jobId, "pi_charge_test", "ch_abc123");
+      expect(r.captured).toBe(true);
+
+      const j = await tx.query("SELECT status, stripe_charge_id FROM jobs WHERE id=$1", [jobId]);
+      expect(j.rows[0].status).toBe("paid");
+      expect(j.rows[0].stripe_charge_id).toBe("ch_abc123");
+
+      const p = await tx.query(
+        "SELECT stripe_charge_id FROM payments WHERE job_id = $1",
+        [jobId],
+      );
+      expect(p.rows).toHaveLength(1);
+      expect(p.rows[0].stripe_charge_id).toBe("ch_abc123");
+    });
+  });
+
+  test("captures: stripeChargeId is nullable when omitted", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      const { jobId } = await setupDoneJob(tx);
+      const r = await capturePayment(tx, COOP_A, jobId, "pi_charge_null");
+      expect(r.captured).toBe(true);
+
+      const j = await tx.query("SELECT stripe_charge_id FROM jobs WHERE id=$1", [jobId]);
+      expect(j.rows[0].stripe_charge_id).toBeNull();
+    });
+  });
+
   test("duplicate delivery is idempotent — no double-charge", async () => {
     await withRollback(COOP_A, async (tx) => {
       const { jobId, finalCents } = await setupDoneJob(tx);

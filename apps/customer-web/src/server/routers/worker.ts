@@ -156,17 +156,24 @@ export const workerRouter = router({
             if (input.taskIndex >= tasks.length)
               throw new TRPCError({ code: "BAD_REQUEST", message: "invalid task index" });
             const existing = tasks[input.taskIndex]!;
-            tasks[input.taskIndex] = {
-              description: existing.description,
-              optional: existing.optional,
-              completed: input.completed,
-              completed_by_member_id: input.completed ? memberId : null,
-              completed_at: input.completed ? new Date().toISOString() : null,
-            };
-            const allDone = tasks.every((t) => t.optional || t.completed);
+            // v8 review Issue E: replace in-place mutation (tasks[i] = ...) with functional
+            // .map() — builds a brand-new array, no shared references with anything
+            // downstream. Same transformation; immutable now.
+            const updatedTasks = tasks.map((t, i) =>
+              i === input.taskIndex
+                ? {
+                    description: existing.description,
+                    optional: existing.optional,
+                    completed: input.completed,
+                    completed_by_member_id: input.completed ? memberId : null,
+                    completed_at: input.completed ? new Date().toISOString() : null,
+                  }
+                : t,
+            );
+            const allDone = updatedTasks.every((t) => t.optional || t.completed);
             await tx.query(
               "UPDATE job_cleaning_checklists SET tasks = $1, completed = $2 WHERE id = $3",
-              [JSON.stringify(tasks), allDone, row.id],
+              [JSON.stringify(updatedTasks), allDone, row.id],
             );
             return { success: true };
           }),
