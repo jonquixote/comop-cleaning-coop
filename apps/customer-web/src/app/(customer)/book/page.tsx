@@ -1,6 +1,6 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import { trpc } from "../../lib/trpc";
+import { trpc } from "../../../lib/trpc";
 
 export default function BookPage() {
   const [sqft, setSqft] = useState(1000);
