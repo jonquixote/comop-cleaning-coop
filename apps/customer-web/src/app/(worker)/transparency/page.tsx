@@ -34,7 +34,7 @@ export default function TransparencyPage() {
     <div>
       <h1>Co-op Transparency</h1>
       <p style={{ color: "#666", fontSize: "0.85rem" }}>
-        Every dollar accounted for. Honest numbers, all sides — info rms, not persuades.
+        Every dollar accounted for. Honest numbers, all sides — informs, not persuades.
       </p>
       <table>
         <tbody>

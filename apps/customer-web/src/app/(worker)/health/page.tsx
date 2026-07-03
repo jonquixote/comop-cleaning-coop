@@ -13,7 +13,7 @@ interface PeriodHealth {
   surplusCents: number;
   currentSurplusSplit: number;
   breakEvenRevenueCents: number;
-  status: "on_track" | "below_break_even" | "deficit";
+  status: "on_track" | "at_break_even" | "deficit";
   statusReason: string;
 }
 
@@ -21,7 +21,7 @@ const c = (n: number) => `$${(n / 100).toFixed(2)}`;
 
 const statusColor: Record<PeriodHealth["status"], string> = {
   on_track: "#14853a",
-  below_break_even: "#b88600",
+  at_break_even: "#b88600",
   deficit: "#b22222",
 };
 
@@ -44,7 +44,7 @@ export default function HealthPage() {
       <h1>Period Health</h1>
       {data.periodId === null ? (
         <p style={{ color: "#666" }}>
-          No open allocation period. Open one to begin tracking period h ealth.
+          No open allocation period. Open one to begin tracking period health.
         </p>
       ) : (
         <>
@@ -57,7 +57,7 @@ export default function HealthPage() {
           <p style={{ color: statusColor[data.status], fontWeight: "bold" }}>
             {data.status === "on_track"
               ? "On track"
-              : data.status === "below_break_even"
+              : data.status === "at_break_even"
                 ? "At break-even"
                 : "Deficit"}{" "}
             — {data.statusReason}

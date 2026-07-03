@@ -6,6 +6,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, authedProcedure } from "@comop/platform/trpc/server";
 import { withSessionTx } from "@comop/platform/identity/session-tx";
+import { resolveMemberId } from "../member";
 
 export interface WorkerJobRow {
   assignmentId: string;
@@ -20,18 +21,21 @@ export interface WorkerJobRow {
   hoursLogged: number | null;
 }
 
-async function resolveMemberId(
-  tx: import("pg").PoolClient,
-  sessionCtx: { userId: string; coOpId: string },
-): Promise<string> {
-  const m = await tx.query<{ id: string }>(
-    "SELECT id FROM members WHERE user_id = $1 AND co_op_id = $2",
-    [sessionCtx.userId, sessionCtx.coOpId],
-  );
-  if ((m.rowCount ?? 0) === 0) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "you are not a member of this co-op" });
-  }
-  return m.rows[0]!.id as string;
+export interface GetJobRow {
+  assignmentId: string;
+  memberId: string;
+  startsAt: string;
+  endsAt: string;
+  hoursLogged: number | null;
+  assignmentStatus: string;
+  jobId: string;
+  jobStatus: string;
+  quotedPriceCents: number;
+  finalPriceCents: number | null;
+  breakdown: unknown;
+  scheduledAt: string | null;
+  customerContact: string;
+  customerAddress: string | null;
 }
 
 export const workerRouter = router({
@@ -67,7 +71,7 @@ export const workerRouter = router({
   getJob: authedProcedure.input(z.object({ jobId: z.string().uuid() })).query(async ({ ctx, input }) =>
     withSessionTx(ctx.token, async (tx, sessionCtx) => {
       const memberId = await resolveMemberId(tx, sessionCtx);
-      const r = await tx.query(
+      const r = await tx.query<GetJobRow>(
         `SELECT ja.id AS "assignmentId",
                 ja.member_id AS "memberId",
                 ja.starts_at AS "startsAt",
@@ -91,7 +95,7 @@ export const workerRouter = router({
       if ((r.rowCount ?? 0) === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "job not found or not assigned to you" });
       }
-      const row = r.rows[0] as Record<string, unknown>;
+      const row = r.rows[0]!;
       return {
         ...row,
         quotedPriceCents: Number(row.quotedPriceCents),
