@@ -5,6 +5,7 @@
 import type { PoolClient } from "pg";
 import { priceJob, type CleaningJobDetails } from "./pricing";
 import { resolveCurrentPolicySnapshot } from "../../platform/policy/policy";
+import { createJobChecklists } from "./checklists";
 
 export interface BookingInput {
   customerId: string;
@@ -40,6 +41,8 @@ export async function createCleaningBooking(
      VALUES ($1, $2, $3, $4, $5, $6)`,
     [jobId, coOpId, input.details.sqft, input.details.bedrooms, input.details.bathrooms, input.details.addons],
   );
+
+  await createJobChecklists(tx, coOpId, jobId, input.details);
 
   return { jobId, quotedPriceCents: breakdown.final_price_cents, policyVersionId: snapshot.policyVersionId };
 }

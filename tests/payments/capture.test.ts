@@ -53,6 +53,11 @@ describe("capturePayment — capture + idempotency + guards", () => {
       expect(j.rows[0].status).toBe("paid");
       const w = await tx.query("SELECT count(*)::int AS n FROM webhook_events WHERE stripe_event_id=$1", ["pi_test_123"]);
       expect(w.rows[0].n).toBe(1);
+      const p = await tx.query(
+        "SELECT count(*)::int AS n FROM payments WHERE job_id = $1",
+        [jobId],
+      );
+      expect(p.rows[0].n).toBe(1);
     });
   });
 

@@ -19,15 +19,32 @@ interface JobDetail {
   customerAddress: string | null;
 }
 
+interface ChecklistTask {
+  description: string;
+  optional: boolean;
+  completed?: boolean;
+}
+
+interface ChecklistSection {
+  id: string;
+  room: string;
+  tasks: ChecklistTask[];
+  completed: boolean;
+}
+
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<JobDetail | null>(null);
+  const [checklist, setChecklist] = useState<ChecklistSection[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    trpc.worker.getJob
-      .query({ jobId: params.id })
-      .then((j) => setJob(j as JobDetail))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load job"));
+    Promise.all([
+      trpc.worker.getJob.query({ jobId: params.id }),
+      trpc.worker.getJobChecklists.query({ jobId: params.id }),
+    ]).then(([j, items]) => {
+      setJob(j as JobDetail);
+      setChecklist(items as ChecklistSection[]);
+    }).catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load job"));
   }, [params.id]);
 
   if (error) return <p style={{ color: "red" }}>{error}</p>;
@@ -55,11 +72,50 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         <dd>{job.hoursLogged !== null ? job.hoursLogged.toFixed(2) : "—"}</dd>
         <dt>Checklist</dt>
         <dd>
-          <em>
-            Cleaning sector checklists are not implemented in MVP. Tracks removed for
-            now; the job_assignments row carries hours_logged and that is the source of
-            truth for labor basis.
-          </em>
+          {checklist.length === 0 ? (
+            <em>No checklist items for this job.</em>
+          ) : (
+            checklist.map((section) => (
+              <details key={section.id} style={{ marginBottom: "0.5rem" }}>
+                <summary>
+                  {section.room}
+                  {section.completed ? " ✅" : ""}
+                </summary>
+                <ul style={{ listStyle: "none", paddingLeft: "1rem" }}>
+                  {section.tasks.map((task, i) => (
+                    <li key={i}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={!!task.completed}
+                          onChange={() => {
+                            trpc.worker.updateChecklistItem.mutate({
+                              checklistId: section.id,
+                              taskIndex: i,
+                              completed: !task.completed,
+                            }).then(() => {
+                              setChecklist(checklist.map(s =>
+                                s.id !== section.id ? s : {
+                                  ...s,
+                                  tasks: s.tasks.map((t, j) =>
+                                    j !== i ? t : { ...t, completed: !t.completed }
+                                  ),
+                                }
+                              ));
+                            }).catch((err: unknown) =>
+                              setError(err instanceof Error ? err.message : "Failed to update task")
+                            );
+                          }}
+                        />{" "}
+                        {task.description}
+                        {task.optional ? " (optional)" : ""}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ))
+          )}
         </dd>
       </dl>
       <p>

@@ -38,6 +38,14 @@ export interface GetJobRow {
   customerAddress: string | null;
 }
 
+interface ChecklistTaskJson {
+  description: string;
+  optional: boolean;
+  completed?: boolean;
+  completed_by_member_id?: string | null;
+  completed_at?: string | null;
+}
+
 export const workerRouter = router({
   workerJobs: authedProcedure.query(async ({ ctx }) =>
     withSessionTx(ctx.token, async (tx, sessionCtx) => {
@@ -104,4 +112,63 @@ export const workerRouter = router({
       };
     }),
   ),
+  getJobChecklists: authedProcedure
+    .input(z.object({ jobId: z.string().uuid() }))
+    .query(async ({ ctx, input }) =>
+      withSessionTx(ctx.token, async (tx, sessionCtx) => {
+        const memberId = await resolveMemberId(tx, sessionCtx);
+        const a = await tx.query(
+          "SELECT 1 FROM job_assignments WHERE job_id = $1 AND member_id = $2 AND co_op_id = $3",
+          [input.jobId, memberId, sessionCtx.coOpId],
+        );
+        if ((a.rowCount ?? 0) === 0)
+          throw new TRPCError({ code: "NOT_FOUND" });
+        const r = await tx.query(
+          `SELECT id, room, tasks, completed, completed_at
+             FROM job_cleaning_checklists
+            WHERE job_id = $1 AND co_op_id = $2
+            ORDER BY room`,
+          [input.jobId, sessionCtx.coOpId],
+        );
+        return r.rows;
+      }),
+    ),
+
+      updateChecklistItem: authedProcedure
+        .input(z.object({
+          checklistId: z.string().uuid(),
+          taskIndex: z.number().int().min(0),
+          completed: z.boolean(),
+        }))
+        .mutation(async ({ ctx, input }) =>
+          withSessionTx(ctx.token, async (tx, sessionCtx) => {
+            const memberId = await resolveMemberId(tx, sessionCtx);
+            const r = await tx.query<{ id: string; tasks: unknown }>(
+              `SELECT jcl.id, jcl.tasks FROM job_cleaning_checklists jcl
+               JOIN job_assignments ja ON ja.job_id = jcl.job_id AND ja.co_op_id = jcl.co_op_id
+               WHERE jcl.id = $1 AND jcl.co_op_id = $2 AND ja.member_id = $3`,
+              [input.checklistId, sessionCtx.coOpId, memberId],
+            );
+            if ((r.rowCount ?? 0) === 0)
+              throw new TRPCError({ code: "NOT_FOUND" });
+            const row = r.rows[0]!;
+            const tasks = row.tasks as ChecklistTaskJson[];
+            if (input.taskIndex >= tasks.length)
+              throw new TRPCError({ code: "BAD_REQUEST", message: "invalid task index" });
+            const existing = tasks[input.taskIndex]!;
+            tasks[input.taskIndex] = {
+              description: existing.description,
+              optional: existing.optional,
+              completed: input.completed,
+              completed_by_member_id: input.completed ? memberId : null,
+              completed_at: input.completed ? new Date().toISOString() : null,
+            };
+            const allDone = tasks.every((t) => t.optional || t.completed);
+            await tx.query(
+              "UPDATE job_cleaning_checklists SET tasks = $1, completed = $2 WHERE id = $3",
+              [JSON.stringify(tasks), allDone, row.id],
+            );
+            return { success: true };
+          }),
+        ),
 });

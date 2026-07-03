@@ -5,6 +5,7 @@ import type { PoolClient } from "pg";
 import { pool } from "../../platform/db/internal/tenant-tx";
 import { getCoOpTransparencyReport } from "../../platform/transparency/transparency";
 import { recordPayout } from "../../platform/payout/payout";
+import { capturePayment } from "../../platform/payments/stripe";
 import { createCleaningBooking } from "../../sectors/cleaning/booking";
 import { COOP_A } from "../../ops/fixtures";
 
@@ -42,10 +43,10 @@ async function paidJob(tx: PoolClient, fraction: number): Promise<PaidJob> {
     customerId: cust.rows[0].id as string,
     details: { sqft: 1000, bedrooms: 2, bathrooms: 1, addons: [] },
   });
-  // done → record payout (guard needs 'done') → paid (so it counts as revenue)
+  // done → record payout (guard needs 'done') → capture (marks paid + writes payments row)
   await tx.query("UPDATE jobs SET status='done', final_price_cents=quoted_price_cents WHERE id=$1", [booked.jobId]);
   await recordPayout(tx, COOP_A, booked.jobId);
-  await tx.query("UPDATE jobs SET status='paid' WHERE id=$1", [booked.jobId]);
+  await capturePayment(tx, COOP_A, booked.jobId, "pi_transparency_test");
 
   const b = (await tx.query("SELECT final_price_cents, breakdown_json FROM jobs WHERE id=$1", [booked.jobId])).rows[0];
   const bd = b.breakdown_json;
@@ -64,7 +65,7 @@ describe("getCoOpTransparencyReport", () => {
       const j = await paidJob(tx, 0.2);
       const rep = await getCoOpTransparencyReport(tx, COOP_A);
 
-      expect(rep.totalRevenueCents).toBe(j.final); // SUM(final_price_cents) of paid jobs
+      expect(rep.totalRevenueCents).toBe(j.final); // SUM(payments.amount_cents) WHERE status='succeeded'
       expect(rep.surplusPoolCents).toBe(j.surplus); // SUM(payout_ledger.surplus_cents)
       expect(rep.laborCents).toBe(j.labor);
       expect(rep.materialsCents).toBe(j.materials);

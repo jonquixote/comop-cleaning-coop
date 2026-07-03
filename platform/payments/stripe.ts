@@ -1,7 +1,9 @@
 // Stripe payment capture (platform, sector-agnostic). Idempotent against duplicate webhook
 // delivery via webhook_events UNIQUE(stripe_event_id): a re-delivered event inserts nothing
 // and does NOT re-mark the job — threat-model mode 2 (never double-charge). Reads the settled
-// final_price_cents from the job (never recomputed). Runs in the caller's tenant transaction.
+// final_price_cents from the job (never recomputed). On first delivery, also writes a row
+// to the `payments` table (spec §4) with status='succeeded' for accurate revenue/period-health
+// queries. Runs in the caller's tenant transaction.
 import type { PoolClient } from "pg";
 
 export class PaymentError extends Error {}
@@ -13,7 +15,7 @@ export async function capturePayment(
   stripePaymentIntentId: string,
 ): Promise<{ captured: boolean; amountCents: number }> {
   const j = await tx.query(
-    "SELECT status, final_price_cents FROM jobs WHERE id = $1 AND co_op_id = $2",
+    "SELECT status, final_price_cents, customer_id FROM jobs WHERE id = $1 AND co_op_id = $2",
     [jobId, coOpId],
   );
   if (j.rowCount === 0) throw new PaymentError("job not found");
@@ -39,6 +41,12 @@ export async function capturePayment(
   // Only the FIRST delivery transitions the job to paid — duplicates are a no-op.
   if (firstDelivery) {
     await tx.query("UPDATE jobs SET status = 'paid' WHERE id = $1 AND co_op_id = $2", [jobId, coOpId]);
+    await tx.query(
+      `INSERT INTO payments (co_op_id, job_id, customer_id, amount_cents,
+                             stripe_payment_intent_id, status, paid_at)
+       VALUES ($1, $2, $3, $4, $5, 'succeeded', now())`,
+      [coOpId, jobId, j.rows[0].customer_id, j.rows[0].final_price_cents, stripePaymentIntentId],
+    );
   }
   return { captured: firstDelivery, amountCents };
 }
