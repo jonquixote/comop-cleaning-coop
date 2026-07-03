@@ -94,7 +94,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                               taskIndex: i,
                               completed: !task.completed,
                             }).then(() => {
-                              setChecklist(prev => prev.map(s =>
+                              setChecklist(checklist.map(s =>
                                 s.id !== section.id ? s : {
                                   ...s,
                                   tasks: s.tasks.map((t, j) =>
