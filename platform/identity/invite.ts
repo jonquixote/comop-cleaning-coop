@@ -92,15 +92,22 @@ export async function redeemInvite(
     `UPDATE invites SET redeemed_at = now() WHERE id = $1 AND redeemed_at IS NULL`,
     [invite.id],
   );
-
-  // Create worker user. Email may be null on the invite; we still need a unique
-  // instance per session so we generate a placeholder if absent (the worker can set
-  // a real one later — out of scope here).
+  const inviteEmail = await tx.query(
+    "SELECT email FROM invites WHERE id = $1",
+    [invite.id],
+  );
+  const email = inviteEmail.rows[0]?.email as string | null;
+  if (!email) {
+    // Roll back the redeemed_at marking by leaving it and letting the caller re-issue.
+    // We chose: explicitly clear it so the same token can be re-issued with an email.
+    await tx.query("UPDATE invites SET redeemed_at = NULL WHERE id = $1", [invite.id]);
+    throw new InviteError("invite has no email — token must be re-issued with an email");
+  }
   const userRes = await tx.query(
     `INSERT INTO users (co_op_id, role, email, password_hash)
      VALUES ($1, 'worker', $2, NULL)
      RETURNING id`,
-    [coOpId, null],
+    [coOpId, email],
   );
   const userId = userRes.rows[0].id as string;
 
