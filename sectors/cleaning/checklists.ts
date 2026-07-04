@@ -24,17 +24,21 @@ export interface RoomDef {
 export function getTemplatesForJob(details: CleaningJobDetails): RoomDef[] {
   const rooms: RoomDef[] = [];
 
-  rooms.push({
-    room: "Kitchen",
-    tasks: [
-      { description: "Wipe countertops", optional: false },
-      { description: "Clean sink", optional: false },
-      { description: "Wipe cabinet fronts", optional: false },
-      { description: "Sweep floor", optional: false },
-      { description: "Mop floor", optional: false },
-      { description: "Empty trash", optional: false },
-    ],
-  });
+  const kitchenTasks: ChecklistTask[] = [
+    { description: "Wipe countertops", optional: false },
+    { description: "Clean sink", optional: false },
+    { description: "Wipe cabinet fronts", optional: false },
+    { description: "Sweep floor", optional: false },
+    { description: "Mop floor", optional: false },
+    { description: "Empty trash", optional: false },
+  ];
+  // Add-on kitchen tasks: the customer paid for these (priced in pricing.ts ADDON_LABOR_MIN),
+  // so the worker's checklist must list them — otherwise paid-for work has no operational teeth.
+  if (details.addons.includes("inside_fridge"))
+    kitchenTasks.push({ description: "Clean inside refrigerator", optional: false });
+  if (details.addons.includes("inside_oven"))
+    kitchenTasks.push({ description: "Clean inside oven", optional: false });
+  rooms.push({ room: "Kitchen", tasks: kitchenTasks });
 
   for (let i = 1; i <= details.bathrooms; i++) {
     const label = details.bathrooms > 1 ? `Bathroom ${i}` : "Bathroom";
@@ -70,6 +74,24 @@ export function getTemplatesForJob(details: CleaningJobDetails): RoomDef[] {
       { description: "Wipe baseboards", optional: true },
     ],
   });
+
+  // Add-ons that don't map to an existing room get their own section (same reason as the
+  // kitchen add-ons above: paid work must appear on the checklist).
+  if (details.addons.includes("windows"))
+    rooms.push({
+      room: "Windows",
+      tasks: [{ description: "Clean interior windows", optional: false }],
+    });
+
+  if (details.addons.includes("deep_clean"))
+    rooms.push({
+      room: "Deep Clean",
+      tasks: [
+        { description: "Detail baseboards throughout", optional: false },
+        { description: "Wipe door frames & light switches", optional: false },
+        { description: "Dust vents & ceiling corners", optional: false },
+      ],
+    });
 
   return rooms;
 }

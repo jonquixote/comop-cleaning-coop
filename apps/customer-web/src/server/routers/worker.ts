@@ -97,11 +97,11 @@ export const workerRouter = router({
            FROM job_assignments ja
            JOIN jobs j ON j.id = ja.job_id
            JOIN customers c ON c.id = j.customer_id
-          WHERE ja.job_id = $1 AND ja.co_op_id = $2 AND ja.member_id = $3`,
+           WHERE ja.job_id = $1 AND ja.co_op_id = $2 AND ja.member_id = $3 AND ja.status <> 'cancelled'`,
         [input.jobId, sessionCtx.coOpId, memberId],
       );
       if ((r.rowCount ?? 0) === 0) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "job not found or not assigned to you" });
+        throw new TRPCError({ code: "NOT_FOUND", message: "job not found, cancelled, or not assigned to you" });
       }
       const row = r.rows[0]!;
       return {
@@ -122,7 +122,7 @@ export const workerRouter = router({
           [input.jobId, memberId, sessionCtx.coOpId],
         );
         if ((a.rowCount ?? 0) === 0)
-          throw new TRPCError({ code: "NOT_FOUND" });
+          throw new TRPCError({ code: "NOT_FOUND", message: "checklist not available or assignment cancelled" });
         const r = await tx.query(
           `SELECT id, room, tasks, completed, completed_at
              FROM job_cleaning_checklists
@@ -151,7 +151,7 @@ export const workerRouter = router({
               [input.checklistId, sessionCtx.coOpId, memberId],
             );
             if ((r.rowCount ?? 0) === 0)
-              throw new TRPCError({ code: "NOT_FOUND" });
+              throw new TRPCError({ code: "NOT_FOUND", message: "checklist not available or assignment cancelled" });
             const row = r.rows[0]!;
             const tasks = row.tasks as ChecklistTaskJson[];
             if (input.taskIndex >= tasks.length)

@@ -53,6 +53,30 @@ describe("getTemplatesForJob", () => {
     ]);
   });
 
+  test("add-ons generate checklist work (kitchen extras + windows + deep-clean sections)", () => {
+    const r = getTemplatesForJob({
+      sqft: 1200,
+      bedrooms: 1,
+      bathrooms: 1,
+      addons: ["inside_fridge", "inside_oven", "windows", "deep_clean"],
+    });
+    const rooms = r.map((x) => x.room);
+    expect(rooms).toContain("Windows");
+    expect(rooms).toContain("Deep Clean");
+    const kitchen = r.find((x) => x.room === "Kitchen")!;
+    const kitchenTasks = kitchen.tasks.map((t) => t.description);
+    expect(kitchenTasks).toContain("Clean inside refrigerator");
+    expect(kitchenTasks).toContain("Clean inside oven");
+  });
+
+  test("no add-ons → no add-on rooms (kitchen has only base tasks)", () => {
+    const r = getTemplatesForJob({ sqft: 800, bedrooms: 1, bathrooms: 1, addons: [] });
+    expect(r.map((x) => x.room)).not.toContain("Windows");
+    expect(r.map((x) => x.room)).not.toContain("Deep Clean");
+    const kitchen = r.find((x) => x.room === "Kitchen")!;
+    expect(kitchen.tasks.map((t) => t.description)).not.toContain("Clean inside oven");
+  });
+
   test("optional tasks marked correctly (baseboards optional, others required)", () => {
     const r = getTemplatesForJob({ sqft: 800, bedrooms: 1, bathrooms: 1, addons: [] });
     for (const room of r) {

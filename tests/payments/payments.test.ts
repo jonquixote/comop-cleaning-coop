@@ -140,6 +140,54 @@ describe("payments query helpers", () => {
     });
   });
 
+  test("recordRefund rejects an amount exceeding the original payment", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      const { jobId, customerId } = await seedPaidJobWithPayment(tx, "refover");
+      const pmt = await tx.query(
+        `INSERT INTO payments (co_op_id, job_id, customer_id, amount_cents, status, paid_at)
+         VALUES ($1,$2,$3,200,'succeeded',now()) RETURNING id`,
+        [COOP_A, jobId, customerId],
+      );
+      await expect(
+        recordRefund(tx, COOP_A, pmt.rows[0].id as string, 201, "too much"),
+      ).rejects.toThrow(/exceeds/);
+      // nothing recorded
+      const n = await tx.query(
+        "SELECT count(*)::int AS n FROM refund_ledger WHERE payment_id = $1",
+        [pmt.rows[0].id],
+      );
+      expect(n.rows[0].n).toBe(0);
+    });
+  });
+
+  test("recordRefund transitions the payment to refunded (status + refunded_at + amount)", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      const { jobId, customerId } = await seedPaidJobWithPayment(tx, "refstate");
+      const pmt = await tx.query(
+        `INSERT INTO payments (co_op_id, job_id, customer_id, amount_cents, status, paid_at)
+         VALUES ($1,$2,$3,200,'succeeded',now()) RETURNING id`,
+        [COOP_A, jobId, customerId],
+      );
+      const paymentId = pmt.rows[0].id as string;
+      await recordRefund(tx, COOP_A, paymentId, 150, "partial");
+      const p = await tx.query(
+        "SELECT status, refunded_at, refund_amount_cents FROM payments WHERE id = $1",
+        [paymentId],
+      );
+      expect(p.rows[0].status).toBe("refunded");
+      expect(p.rows[0].refunded_at).not.toBeNull();
+      expect(p.rows[0].refund_amount_cents).toBe(150);
+    });
+  });
+
+  test("recordRefund throws when the payment does not exist", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      await expect(
+        recordRefund(tx, COOP_A, "00000000-0000-0000-0000-0000000000ff", 100, "ghost"),
+      ).rejects.toThrow(/not found/);
+    });
+  });
+
   test("cross-tenant isolation: COOP_B sees zero COOP_A payments", async () => {
     await withRollback(COOP_A, async (tx) => {
       const { jobId, customerId } = await seedPaidJobWithPayment(tx, "iso");
