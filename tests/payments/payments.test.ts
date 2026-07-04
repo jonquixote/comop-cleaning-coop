@@ -126,6 +126,60 @@ describe("payments query helpers", () => {
     });
   });
 
+  test("recordRefund allows a refund exactly equal to the original amount (boundary)", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      const { jobId, customerId } = await seedPaidJobWithPayment(tx, "refeq");
+      const pmt = await tx.query(
+        `INSERT INTO payments (co_op_id, job_id, customer_id, amount_cents, status, paid_at)
+         VALUES ($1,$2,$3,200,'succeeded',now()) RETURNING id`,
+        [COOP_A, jobId, customerId],
+      );
+      const paymentId = pmt.rows[0].id as string;
+      // amount == original: the `>` guard must NOT trip on equality (full refund is legal).
+      const r = await recordRefund(tx, COOP_A, paymentId, 200, "full refund");
+      expect(r).toEqual({ recorded: true });
+      const p = await tx.query(
+        "SELECT status, refund_amount_cents FROM payments WHERE id = $1",
+        [paymentId],
+      );
+      expect(p.rows[0].status).toBe("refunded");
+      expect(p.rows[0].refund_amount_cents).toBe(200);
+    });
+  });
+
+  test("recordRefund rejects a second refund on an already-refunded payment (no stacking)", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      const { jobId, customerId } = await seedPaidJobWithPayment(tx, "refagain");
+      const pmt = await tx.query(
+        `INSERT INTO payments (co_op_id, job_id, customer_id, amount_cents, status, paid_at)
+         VALUES ($1,$2,$3,200,'succeeded',now()) RETURNING id`,
+        [COOP_A, jobId, customerId],
+      );
+      const paymentId = pmt.rows[0].id as string;
+
+      const first = await recordRefund(tx, COOP_A, paymentId, 150, "partial");
+      expect(first).toEqual({ recorded: true });
+
+      // A DIFFERENT, later refund attempt on the now-refunded payment: UNIQUE(payment_id)
+      // means one refund per payment, ever — the second is rejected (recorded:false, no
+      // throw) and cannot stack a second amount onto the payment.
+      const second = await recordRefund(tx, COOP_A, paymentId, 40, "second attempt");
+      expect(second).toEqual({ recorded: false });
+
+      const ledger = await tx.query(
+        "SELECT count(*)::int AS n, max(amount_cents) AS amt FROM refund_ledger WHERE payment_id = $1",
+        [paymentId],
+      );
+      expect(ledger.rows[0].n).toBe(1); // only the first refund exists
+      expect(ledger.rows[0].amt).toBe(150); // untouched by the second attempt
+      const p = await tx.query(
+        "SELECT refund_amount_cents FROM payments WHERE id = $1",
+        [paymentId],
+      );
+      expect(p.rows[0].refund_amount_cents).toBe(150); // not double-refunded
+    });
+  });
+
   test("recordRefund rejects non-positive amount", async () => {
     await withRollback(COOP_A, async (tx) => {
       const { jobId, customerId } = await seedPaidJobWithPayment(tx, "refneg");
@@ -137,6 +191,54 @@ describe("payments query helpers", () => {
       await expect(
         recordRefund(tx, COOP_A, pmt.rows[0].id as string, 0, "test"),
       ).rejects.toThrow(/positive/);
+    });
+  });
+
+  test("recordRefund rejects an amount exceeding the original payment", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      const { jobId, customerId } = await seedPaidJobWithPayment(tx, "refover");
+      const pmt = await tx.query(
+        `INSERT INTO payments (co_op_id, job_id, customer_id, amount_cents, status, paid_at)
+         VALUES ($1,$2,$3,200,'succeeded',now()) RETURNING id`,
+        [COOP_A, jobId, customerId],
+      );
+      await expect(
+        recordRefund(tx, COOP_A, pmt.rows[0].id as string, 201, "too much"),
+      ).rejects.toThrow(/exceeds/);
+      // nothing recorded
+      const n = await tx.query(
+        "SELECT count(*)::int AS n FROM refund_ledger WHERE payment_id = $1",
+        [pmt.rows[0].id],
+      );
+      expect(n.rows[0].n).toBe(0);
+    });
+  });
+
+  test("recordRefund transitions the payment to refunded (status + refunded_at + amount)", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      const { jobId, customerId } = await seedPaidJobWithPayment(tx, "refstate");
+      const pmt = await tx.query(
+        `INSERT INTO payments (co_op_id, job_id, customer_id, amount_cents, status, paid_at)
+         VALUES ($1,$2,$3,200,'succeeded',now()) RETURNING id`,
+        [COOP_A, jobId, customerId],
+      );
+      const paymentId = pmt.rows[0].id as string;
+      await recordRefund(tx, COOP_A, paymentId, 150, "partial");
+      const p = await tx.query(
+        "SELECT status, refunded_at, refund_amount_cents FROM payments WHERE id = $1",
+        [paymentId],
+      );
+      expect(p.rows[0].status).toBe("refunded");
+      expect(p.rows[0].refunded_at).not.toBeNull();
+      expect(p.rows[0].refund_amount_cents).toBe(150);
+    });
+  });
+
+  test("recordRefund throws when the payment does not exist", async () => {
+    await withRollback(COOP_A, async (tx) => {
+      await expect(
+        recordRefund(tx, COOP_A, "00000000-0000-0000-0000-0000000000ff", 100, "ghost"),
+      ).rejects.toThrow(/not found/);
     });
   });
 

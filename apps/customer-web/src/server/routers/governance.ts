@@ -7,6 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { router, authedProcedure } from "@comop/platform/trpc/server";
 import { withSessionTx } from "@comop/platform/identity/session-tx";
 import { castVote as platformCastVote } from "@comop/platform/governance/proposals";
+import { GovernanceError } from "@comop/platform/governance/errors";
 import { resolveMemberId } from "../member";
 
 interface ProposalListRow {
@@ -112,10 +113,13 @@ export const governanceRouter = router({
             input.choice,
           );
         } catch (err) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: err instanceof Error ? err.message : String(err),
-          });
+          // Only surface messages from our own domain errors (known-safe, user-facing).
+          // Anything else (a raw pg/driver error) could leak schema/internals — map it to
+          // a generic message and keep the detail server-side.
+          if (err instanceof GovernanceError) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: err.message });
+          }
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "could not cast vote" });
         }
         return { ok: true };
       }),

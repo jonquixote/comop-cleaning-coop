@@ -46,7 +46,10 @@ async function paidJob(tx: PoolClient, fraction: number): Promise<PaidJob> {
   // done → record payout (guard needs 'done') → capture (marks paid + writes payments row)
   await tx.query("UPDATE jobs SET status='done', final_price_cents=quoted_price_cents WHERE id=$1", [booked.jobId]);
   await recordPayout(tx, COOP_A, booked.jobId);
-  await capturePayment(tx, COOP_A, booked.jobId, "pi_transparency_test");
+  // Unique Stripe id per job: capturePayment keys idempotency on webhook_events
+  // UNIQUE(stripe_event_id), so a shared id would make a second capture a silent no-op
+  // (no payments row, wrong revenue) once this helper is used for more than one job.
+  await capturePayment(tx, COOP_A, booked.jobId, `pi_transparency_${booked.jobId}`);
 
   const b = (await tx.query("SELECT final_price_cents, breakdown_json FROM jobs WHERE id=$1", [booked.jobId])).rows[0];
   const bd = b.breakdown_json;
