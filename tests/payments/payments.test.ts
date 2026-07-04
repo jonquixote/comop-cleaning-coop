@@ -176,8 +176,8 @@ describe("payments backfill — v8 review Issue C", () => {
             WHERE payments.co_op_id = jobs.co_op_id
               AND payments.job_id = jobs.id
           )`;
-      await tx.query(insertSql, [jobId]);
-      await tx.query(insertSql, [jobId]); // re-run: should not insert nothing
+      await tx.query(insertSql, [jobId]); // first run: insert
+      await tx.query(insertSql, [jobId]); // re-run: should not insert anything (idempotent)
       const r = await tx.query(
         "SELECT count(*)::int AS n FROM payments WHERE job_id = $1",
         [jobId],
