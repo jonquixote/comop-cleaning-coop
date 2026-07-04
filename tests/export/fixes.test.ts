@@ -1,4 +1,5 @@
-// Step 8 fixes — adversarial tests for the four review items on PR #9 (Gemini Code Assist).
+// Step 8 fixes — adversarial tests for the five review items on PR #9/#11 (Gemini Code Assist).
+// Fix #5: importCoOpData JSON.stringify for jsonb columns on re-import.
 //
 // Each test maps to one review finding and starts failing on the pre-fix code. The
 // tests assert the post-fix contract AND keep the existing roundtrip invariants
@@ -326,5 +327,107 @@ describe("verifyRoundTrip — defensive date parsing (#4)", () => {
     const result = verifyRoundTrip(original, original);
     expect(result.valid).toBe(true);
     expect(result.errors).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fix #5 — importCoOpData JSON.stringify for jsonb columns. pg's prepareValue
+// serializes JS arrays as Postgres array literals ({...}) instead of JSON.
+// Without stringification, jsonb columns containing arrays (e.g. checklist
+// tasks, breakdown_json, value_json) fail with "invalid input syntax for
+// type json". The fix reads per-column type metadata (V3+ export documents)
+// and JSON.stringify-es any non-null object/array value for jsonb/json columns
+// before handing the parameter to pg.
+// ---------------------------------------------------------------------------
+
+describe("jsonb column encoding (#5)", () => {
+  afterEach(async () => {
+    await withOwnerClient((c) => cleanup(c));
+  });
+
+  test("JS array in jsonb column survives import (pg's prepareValue would produce array literal)", async () => {
+    const ROW_ID = "00000000-0000-0000-0000-0000000000aa";
+    const doc: ExportDocument = {
+      version: 3,
+      exportedAt: new Date().toISOString(),
+      coOpId: SRC,
+      tables: {
+        co_ops: {
+          rowCount: 1,
+          columnTypes: { id: "uuid", name: "text" },
+          rows: [{ id: SRC, name: "src" }],
+        },
+        policy_settings: {
+          rowCount: 1,
+          columnTypes: {
+            id: "uuid",
+            co_op_id: "uuid",
+            key: "text",
+            value_json: "jsonb",
+          },
+          rows: [
+            {
+              id: ROW_ID,
+              co_op_id: SRC,
+              key: "test",
+              value_json: [1, 2, 3], // JS array — pg would encode as {1,2,3} without the fix
+            },
+          ],
+        },
+      },
+    };
+
+    await withOwnerClient(async (oc) => {
+      await insertCoOp(oc, TGT, "tgt");
+      const result = await importCoOpData(oc, TGT, doc);
+      expect(result.rowsImported).toBeGreaterThanOrEqual(1);
+      expect(result.warnings).toEqual([]); // V3 doc, no legacy warnings
+
+      // Verify the jsonb array round-tripped correctly
+      await withTenantClient(TGT, async (qc) => {
+        const r = await qc.query<{ value_json: unknown }>(
+          "SELECT value_json FROM policy_settings WHERE key = $1 AND co_op_id = $2",
+          ["test", TGT],
+        );
+        expect(r.rows.length).toBe(1);
+        const val = r.rows[0]!.value_json;
+        expect(Array.isArray(val)).toBe(true);
+        expect(val).toEqual([1, 2, 3]);
+      });
+    });
+  });
+
+  test("legacy V1 document without columnTypes emits warning for jsonb column", async () => {
+    const ROW_ID = "00000000-0000-0000-0000-0000000000bb";
+    const doc: ExportDocument = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      coOpId: SRC,
+      tables: {
+        co_ops: {
+          rowCount: 1,
+          columnTypes: { id: "uuid", name: "text" },
+          rows: [{ id: SRC, name: "src" }],
+        },
+        policy_settings: {
+          rowCount: 1,
+          // No columnTypes — legacy V1 document
+          rows: [
+            {
+              id: ROW_ID,
+              co_op_id: SRC,
+              key: "test",
+              value_json: { a: 1 }, // will NOT be stringified (columnTypes missing)
+            },
+          ],
+        },
+      },
+    };
+
+    await withOwnerClient(async (oc) => {
+      await insertCoOp(oc, TGT, "tgt");
+      const result = await importCoOpData(oc, TGT, doc);
+      expect(result.warnings).toContain("legacy-export-document:jsonb-type-undetermined");
+    });
   });
 });

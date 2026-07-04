@@ -111,7 +111,27 @@ async function runImport(
 
   const insertRow = async (table: string, tdef: ExportTable, row: Record<string, unknown>): Promise<number> => {
     const cols = Object.keys(row);
-    const values = cols.map((c) => remapForColumn(row[c], table, c));
+    // pg's parameter encoder serializes JS arrays as Postgres array literals
+    // ({...}) — which is wrong for jsonb columns. JSON-stringify any non-null
+    // object/array value before handing it to pg; pg will then parse the
+    // resulting string as JSON when it hits a jsonb column. Without this,
+    // checklist / breakdown / value_json columns get wire-encoded as
+    // pg-array literals and Postgres errors "invalid input syntax for type
+    // json" (issue surfaced by v8+refund review; reproducible with one row).
+    const ct = tdef.columnTypes ?? {};
+    if (!tdef.columnTypes) {
+      if (!warnings.includes("legacy-export-document:jsonb-type-undetermined")) {
+        warnings.push("legacy-export-document:jsonb-type-undetermined");
+      }
+    }
+    const values = cols.map((c) => {
+      const v = remapForColumn(row[c], table, c);
+      const colType = ct[c.toLowerCase()];
+      if ((colType === "jsonb" || colType === "json") && v !== null && typeof v === "object") {
+        return JSON.stringify(v);
+      }
+      return v;
+    });
     const r = await client.query(
       `INSERT INTO "${table}" (${cols.map((c) => `"${c}"`).join(", ")})
        VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")})
