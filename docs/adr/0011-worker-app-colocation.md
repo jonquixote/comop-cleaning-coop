@@ -1,4 +1,4 @@
-# ADR-0010: Worker app — colocate with customer-web (route group, shared Next.js)
+# ADR-0011: Worker app — colocate with customer-web (route group, shared Next.js)
 
 - **Status:** Accepted
 - **Date:** 2026-07-02 (Phase 1 check-in)

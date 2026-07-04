@@ -6,7 +6,7 @@
 // the (userId, coOpId) pair coming from the session chain — never from
 // any client-supplied input. The session token resolves via withSessionTx
 // to a SessionContext that already enforces tenant isolation per
-// ADR-0004 / ADR-0010.
+// ADR-0004 / ADR-0010 (managed-pg).
 import { TRPCError } from "@trpc/server";
 import type { PoolClient } from "pg";
 
