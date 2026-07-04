@@ -1,13 +1,13 @@
 // Financial transparency (platform, sector-agnostic — impl §6, the anti-waste surface).
 // The live economics every worker-owner can see: revenue, cost components, the surplus pool,
-// and the current pay↔price lever. Reads only existing tables (jobs, payout_ledger,
-// policy_settings, expenses) — honest numbers, all sides; inform, don't steer. Runs in
+// and the current pay↔price lever. Reads tenant tables (jobs, payments, payout_ledger,
+// expenses) + policy_settings — honest numbers, all sides; inform, don't steer. Runs in
 // the caller's tx.
 import type { PoolClient } from "pg";
 import { resolveCurrentPolicySnapshot } from "../policy/policy";
 
 export interface TransparencyReport {
-  totalRevenueCents: number; // SUM(final_price_cents) of paid jobs
+  totalRevenueCents: number; // SUM(payments.amount_cents) WHERE status='succeeded'
   laborCents: number;
   materialsCents: number;
   overheadCents: number;
@@ -17,13 +17,17 @@ export interface TransparencyReport {
 }
 
 export async function getCoOpTransparencyReport(tx: PoolClient, coOpId: string): Promise<TransparencyReport> {
-  const econ = await tx.query(
+  const rev = await tx.query(
+    `SELECT COALESCE(SUM(amount_cents), 0)::bigint AS revenue
+       FROM payments WHERE status = 'succeeded' AND co_op_id = $1`,
+    [coOpId],
+  );
+  const costs = await tx.query(
     `SELECT
-       COALESCE(SUM(final_price_cents), 0)::bigint                             AS revenue,
-       COALESCE(SUM((breakdown_json->>'labor_cents')::int), 0)::bigint         AS labor,
-       COALESCE(SUM((breakdown_json->>'materials_cents')::int), 0)::bigint     AS materials,
-       COALESCE(SUM((breakdown_json->>'overhead_alloc_cents')::int), 0)::bigint AS overhead
-     FROM jobs WHERE status = 'paid' AND co_op_id = $1`,
+        COALESCE(SUM((breakdown_json->>'labor_cents')::int), 0)::bigint         AS labor,
+        COALESCE(SUM((breakdown_json->>'materials_cents')::int), 0)::bigint     AS materials,
+        COALESCE(SUM((breakdown_json->>'overhead_alloc_cents')::int), 0)::bigint AS overhead
+       FROM jobs WHERE status = 'paid' AND co_op_id = $1`,
     [coOpId],
   );
   const surplus = await tx.query(
@@ -33,10 +37,10 @@ export async function getCoOpTransparencyReport(tx: PoolClient, coOpId: string):
   const policy = await resolveCurrentPolicySnapshot(tx);
 
   return {
-    totalRevenueCents: Number(econ.rows[0].revenue),
-    laborCents: Number(econ.rows[0].labor),
-    materialsCents: Number(econ.rows[0].materials),
-    overheadCents: Number(econ.rows[0].overhead),
+    totalRevenueCents: Number(rev.rows[0].revenue),
+    laborCents: Number(costs.rows[0].labor),
+    materialsCents: Number(costs.rows[0].materials),
+    overheadCents: Number(costs.rows[0].overhead),
     surplusPoolCents: Number(surplus.rows[0].s),
     currentSurplusSplit: policy.surplusSplit,
     policyVersionId: policy.policyVersionId,
@@ -48,7 +52,7 @@ export async function getCoOpTransparencyReport(tx: PoolClient, coOpId: string):
 //   - revenue vs. fixed + variable costs FOR THE CURRENT OPEN PERIOD
 //   - break-even line (minimum revenue to cover costs)
 //   - surplus or deficit for the period so far
-//   - a clear health indicator ("on_track" / "below_break_even" / "deficit")
+//   - a clear health indicator ("on_track" / "at_break_even" / "deficit")
 //
 // NOTE ON THE BREAK-EVEN FORMULA:
 //   surplusSplit is the FRACTION OF SURPLUS that goes to workers (spec §6 — the
@@ -57,16 +61,16 @@ export async function getCoOpTransparencyReport(tx: PoolClient, coOpId: string):
 //   == totalCosts. Lowering surplusSplit moves WORKER TAKE-HOME per unit of
 //   surplus (it does NOT change when the co-op can cover its costs).
 
-export type PeriodHealthStatus = "on_track" | "below_break_even" | "deficit";
+export type PeriodHealthStatus = "on_track" | "at_break_even" | "deficit";
 
 export interface PeriodHealth {
   periodId: string | null;          // null if no open period exists for this co-op
   periodStartsAt: string | null;
   periodEndsAt: string | null;
-  totalRevenueCents: number;        // SUM(payout_ledger.amount_cents) within the open period window
+  totalRevenueCents: number;        // SUM(payments.amount_cents) WHERE status='succeeded' within the period window
   totalExpensesCents: number;       // SUM(expenses.amount_cents) within the window
   fixedCostsCents: number;          // = totalExpenses within the window (no separate fixed/variable split yet)
-  laborCents: number;               // SUM(payout_ledger.labor_basis_cents) within the window (worker pay booked)
+  laborCents: number;               // SUM(jobs.breakdown_json->>'labor_cents') of done/paid jobs within the window (worker pay booked)
   surplusCents: number;             // revenue - expenses
   currentSurplusSplit: number;      // from policy (informs worker share, NOT break-even)
   breakEvenRevenueCents: number;    // == totalExpensesCents (surplus=0 when revenue exactly covers costs)
@@ -106,17 +110,15 @@ export async function getPeriodHealth(tx: PoolClient, coOpId: string): Promise<P
   const pEnd = period.rows[0].ends_at as Date;
 
   // Read surfaces:
-  //   - revenue from SUM(final_price_cents) of jobs that were recorded in this window
-  //     (we use jobs.updated_at as the closest proxy — `recorded_at` doesn't exist on jobs;
-  //      this is intentionally a coarse approximation; the canonical period truth is the
-  //      explicit ledger written by closeAllocationPeriod, computed afterwards, not live).
+  //   - revenue from SUM(amount_cents) of succeeded payments in this window
+  //     (payments.paid_at is the canonical money-in timestamp)
   //   - expenses from expenses.amount_cents within the window
   //   - labor from SUM(jobs.breakdown_json->>'labor_cents'::int) of done/paid jobs in window
   const rev = await tx.query(
-    `SELECT COALESCE(SUM(final_price_cents), 0)::bigint AS r
-       FROM jobs
-      WHERE co_op_id = $1 AND updated_at >= $2 AND updated_at <= $3
-        AND status IN ('done','paid')`,
+    `SELECT COALESCE(SUM(amount_cents), 0)::bigint AS r
+       FROM payments
+      WHERE co_op_id = $1 AND paid_at >= $2 AND paid_at <= $3
+        AND status = 'succeeded'`,
     [coOpId, pStart, pEnd],
   );
   const exp = await tx.query(
@@ -140,14 +142,14 @@ export async function getPeriodHealth(tx: PoolClient, coOpId: string): Promise<P
   const surplusCents = totalRevenueCents - totalExpensesCents;
   const breakEvenRevenueCents = totalExpensesCents; // surplus = 0 ⟺ revenue == costs
 
-  // Status rule: surplus > 0 → on_track; surplus == 0 → below_break_even; surplus < 0 → deficit.
+  // Status rule: surplus > 0 → on_track; surplus == 0 → at_break_even; surplus < 0 → deficit.
   // No revenue at all (also a viable case for a brand-new period) is a deficit until costs kick in.
   const status: PeriodHealthStatus =
-    surplusCents > 0 ? "on_track" : surplusCents === 0 ? "below_break_even" : "deficit";
+    surplusCents > 0 ? "on_track" : surplusCents === 0 ? "at_break_even" : "deficit";
   const statusReason =
     status === "on_track"
       ? `surplus ${surplusCents} cents above break-even`
-      : status === "below_break_even"
+      : status === "at_break_even"
         ? `exactly at break-even (revenue = costs)`
         : `deficit of ${Math.abs(surplusCents)} cents below break-even`;
 

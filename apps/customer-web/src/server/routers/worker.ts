@@ -6,6 +6,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, authedProcedure } from "@comop/platform/trpc/server";
 import { withSessionTx } from "@comop/platform/identity/session-tx";
+import { resolveMemberId } from "../member";
 
 export interface WorkerJobRow {
   assignmentId: string;
@@ -20,18 +21,29 @@ export interface WorkerJobRow {
   hoursLogged: number | null;
 }
 
-async function resolveMemberId(
-  tx: import("pg").PoolClient,
-  sessionCtx: { userId: string; coOpId: string },
-): Promise<string> {
-  const m = await tx.query<{ id: string }>(
-    "SELECT id FROM members WHERE user_id = $1 AND co_op_id = $2",
-    [sessionCtx.userId, sessionCtx.coOpId],
-  );
-  if ((m.rowCount ?? 0) === 0) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "you are not a member of this co-op" });
-  }
-  return m.rows[0]!.id as string;
+export interface GetJobRow {
+  assignmentId: string;
+  memberId: string;
+  startsAt: string;
+  endsAt: string;
+  hoursLogged: number | null;
+  assignmentStatus: string;
+  jobId: string;
+  jobStatus: string;
+  quotedPriceCents: number;
+  finalPriceCents: number | null;
+  breakdown: unknown;
+  scheduledAt: string | null;
+  customerContact: string;
+  customerAddress: string | null;
+}
+
+interface ChecklistTaskJson {
+  description: string;
+  optional: boolean;
+  completed?: boolean;
+  completed_by_member_id?: string | null;
+  completed_at?: string | null;
 }
 
 export const workerRouter = router({
@@ -67,7 +79,7 @@ export const workerRouter = router({
   getJob: authedProcedure.input(z.object({ jobId: z.string().uuid() })).query(async ({ ctx, input }) =>
     withSessionTx(ctx.token, async (tx, sessionCtx) => {
       const memberId = await resolveMemberId(tx, sessionCtx);
-      const r = await tx.query(
+      const r = await tx.query<GetJobRow>(
         `SELECT ja.id AS "assignmentId",
                 ja.member_id AS "memberId",
                 ja.starts_at AS "startsAt",
@@ -91,7 +103,7 @@ export const workerRouter = router({
       if ((r.rowCount ?? 0) === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "job not found or not assigned to you" });
       }
-      const row = r.rows[0] as Record<string, unknown>;
+      const row = r.rows[0]!;
       return {
         ...row,
         quotedPriceCents: Number(row.quotedPriceCents),
@@ -100,4 +112,70 @@ export const workerRouter = router({
       };
     }),
   ),
+  getJobChecklists: authedProcedure
+    .input(z.object({ jobId: z.string().uuid() }))
+    .query(async ({ ctx, input }) =>
+      withSessionTx(ctx.token, async (tx, sessionCtx) => {
+        const memberId = await resolveMemberId(tx, sessionCtx);
+        const a = await tx.query(
+          "SELECT 1 FROM job_assignments WHERE job_id = $1 AND member_id = $2 AND co_op_id = $3",
+          [input.jobId, memberId, sessionCtx.coOpId],
+        );
+        if ((a.rowCount ?? 0) === 0)
+          throw new TRPCError({ code: "NOT_FOUND" });
+        const r = await tx.query(
+          `SELECT id, room, tasks, completed, completed_at
+             FROM job_cleaning_checklists
+            WHERE job_id = $1 AND co_op_id = $2
+            ORDER BY room`,
+          [input.jobId, sessionCtx.coOpId],
+        );
+        return r.rows;
+      }),
+    ),
+
+      updateChecklistItem: authedProcedure
+        .input(z.object({
+          checklistId: z.string().uuid(),
+          taskIndex: z.number().int().min(0),
+          completed: z.boolean(),
+        }))
+        .mutation(async ({ ctx, input }) =>
+          withSessionTx(ctx.token, async (tx, sessionCtx) => {
+            const memberId = await resolveMemberId(tx, sessionCtx);
+            const r = await tx.query<{ id: string; tasks: unknown }>(
+              `SELECT jcl.id, jcl.tasks FROM job_cleaning_checklists jcl
+               JOIN job_assignments ja ON ja.job_id = jcl.job_id AND ja.co_op_id = jcl.co_op_id
+               WHERE jcl.id = $1 AND jcl.co_op_id = $2 AND ja.member_id = $3`,
+              [input.checklistId, sessionCtx.coOpId, memberId],
+            );
+            if ((r.rowCount ?? 0) === 0)
+              throw new TRPCError({ code: "NOT_FOUND" });
+            const row = r.rows[0]!;
+            const tasks = row.tasks as ChecklistTaskJson[];
+            if (input.taskIndex >= tasks.length)
+              throw new TRPCError({ code: "BAD_REQUEST", message: "invalid task index" });
+            const existing = tasks[input.taskIndex]!;
+            // v8 review Issue E: replace in-place mutation (tasks[i] = ...) with functional
+            // .map() — builds a brand-new array, no shared references with anything
+            // downstream. Same transformation; immutable now.
+            const updatedTasks = tasks.map((t, i) =>
+              i === input.taskIndex
+                ? {
+                    description: existing.description,
+                    optional: existing.optional,
+                    completed: input.completed,
+                    completed_by_member_id: input.completed ? memberId : null,
+                    completed_at: input.completed ? new Date().toISOString() : null,
+                  }
+                : t,
+            );
+            const allDone = updatedTasks.every((t) => t.optional || t.completed);
+            await tx.query(
+              "UPDATE job_cleaning_checklists SET tasks = $1, completed = $2 WHERE id = $3",
+              [JSON.stringify(updatedTasks), allDone, row.id],
+            );
+            return { success: true };
+          }),
+        ),
 });

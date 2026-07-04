@@ -39,7 +39,7 @@ export default function EarningsPage() {
         <h2>Capital account(patronage)</h2>
         <p>Balance: <strong>{c(data.capitalBalanceCents)}</strong></p>
         <p style={{ fontSize: "0.85rem", color: "#666" }}>
-          Tax-conformant patronage treatment requires bylaws + CPA sign-off (see ADR/sp ec §9). Do not rely on this for filings until confirmed.
+          Tax-conformant patronage treatment requires bylaws + CPA sign-off (see ADR/spec §9). Do not rely on this for filings until confirmed.
         </p>
       </section>
       <section>

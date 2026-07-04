@@ -7,6 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { router, authedProcedure } from "@comop/platform/trpc/server";
 import { withSessionTx } from "@comop/platform/identity/session-tx";
 import { issueInvite } from "@comop/platform/identity/invite";
+import { resolveMemberId } from "../member";
 
 export const invitesRouter = router({
   issueInvite: authedProcedure
@@ -22,14 +23,11 @@ export const invitesRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "only admins may issue invites" });
         }
         // Member id (the issuer) — the invite row needs a FK to a member.
-        const m = await tx.query<{ id: string }>(
-          "SELECT id FROM members WHERE user_id = $1 AND co_op_id = $2",
-          [sessionCtx.userId, sessionCtx.coOpId],
+        const issuedByMemberId = await resolveMemberId(
+          tx,
+          sessionCtx,
+          "admin must also be a member to issue invites",
         );
-        if ((m.rowCount ?? 0) === 0) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "admin must also be a member to issue invites" });
-        }
-        const issuedByMemberId = m.rows[0]!.id as string;
         const { token, expiresAt } = await issueInvite(tx, sessionCtx.coOpId, issuedByMemberId, {
           email: input.email,
         });

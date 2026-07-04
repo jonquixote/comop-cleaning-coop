@@ -7,25 +7,42 @@ import { TRPCError } from "@trpc/server";
 import { router, authedProcedure } from "@comop/platform/trpc/server";
 import { withSessionTx } from "@comop/platform/identity/session-tx";
 import { castVote as platformCastVote } from "@comop/platform/governance/proposals";
+import { resolveMemberId } from "../member";
 
-async function resolveMemberId(
-  tx: import("pg").PoolClient,
-  sessionCtx: { userId: string; coOpId: string },
-): Promise<string> {
-  const m = await tx.query<{ id: string; status: string }>(
-    "SELECT id, status FROM members WHERE user_id = $1 AND co_op_id = $2",
-    [sessionCtx.userId, sessionCtx.coOpId],
-  );
-  if ((m.rowCount ?? 0) === 0) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "you are not a member of this co-op" });
-  }
-  return m.rows[0]!.id as string;
+interface ProposalListRow {
+  id: string;
+  title: string;
+  body: string | null;
+  type: string | null;
+  status: string;
+  opensAt: Date | null;
+  closesAt: Date | null;
+  stakesLevel: string | null;
+  createdAt: Date;
+}
+
+interface ProposalDetailRow {
+  id: string;
+  title: string;
+  body: string | null;
+  type: string | null;
+  status: string;
+  opensAt: Date | null;
+  closesAt: Date | null;
+  stakesLevel: string | null;
+  transparencySnapshot: unknown;
+  createdAt: Date;
+}
+
+interface TallyRow {
+  choice: string;
+  c: number;
 }
 
 export const governanceRouter = router({
   listProposals: authedProcedure.query(async ({ ctx }) =>
     withSessionTx(ctx.token, async (tx, sessionCtx) => {
-      const r = await tx.query(
+      const r = await tx.query<ProposalListRow>(
         `SELECT id, title, body, type, status,
                 opens_at AS "opensAt",
                 closes_at AS "closesAt",
@@ -39,21 +56,21 @@ export const governanceRouter = router({
       );
       return r.rows.map((row) => ({
         ...row,
-        opensAt: row.opensAt === null ? null : (row.opensAt as Date).toISOString(),
-        closesAt: row.closesAt === null ? null : (row.closesAt as Date).toISOString(),
-        createdAt: (row.createdAt as Date).toISOString(),
+        opensAt: row.opensAt === null ? null : row.opensAt.toISOString(),
+        closesAt: row.closesAt === null ? null : row.closesAt.toISOString(),
+        createdAt: row.createdAt.toISOString(),
       }));
     }),
   ),
 
   getProposal: authedProcedure.input(z.object({ proposalId: z.string().uuid() })).query(async ({ ctx, input }) =>
     withSessionTx(ctx.token, async (tx, sessionCtx) => {
-      const r = await tx.query(
+      const r = await tx.query<ProposalDetailRow>(
         `SELECT id, title, body, type, status,
                 opens_at AS "opensAt",
                 closes_at AS "closesAt",
                 stakes_level AS "stakesLevel",
-                transparency_snapshot AS "transparencySnapshot",
+                transparency_snapshot_json AS "transparencySnapshot",
                 created_at AS "createdAt"
            FROM proposals
           WHERE id = $1 AND co_op_id = $2`,
@@ -62,20 +79,20 @@ export const governanceRouter = router({
       if ((r.rowCount ?? 0) === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "proposal not found" });
       }
-      const tallies = await tx.query(
+      const tallies = await tx.query<TallyRow>(
         `SELECT choice, COUNT(*)::int AS c
            FROM votes WHERE proposal_id = $1 AND co_op_id = $2
           GROUP BY choice`,
         [input.proposalId, sessionCtx.coOpId],
       );
       const tally: Record<"yes" | "no" | "abstain", number> = { yes: 0, no: 0, abstain: 0 };
-      for (const t of tallies.rows) tally[t.choice as "yes" | "no" | "abstain"] = t.c as number;
-      const row = r.rows[0] as Record<string, unknown>;
+      for (const t of tallies.rows) tally[t.choice as "yes" | "no" | "abstain"] = t.c;
+      const row = r.rows[0]!;
       return {
         ...row,
-        opensAt: row.opensAt === null ? null : (row.opensAt as Date).toISOString(),
-        closesAt: row.closesAt === null ? null : (row.closesAt as Date).toISOString(),
-        createdAt: (row.createdAt as Date).toISOString(),
+        opensAt: row.opensAt === null ? null : row.opensAt.toISOString(),
+        closesAt: row.closesAt === null ? null : row.closesAt.toISOString(),
+        createdAt: row.createdAt.toISOString(),
         tallies: tally,
       };
     }),
@@ -95,10 +112,10 @@ export const governanceRouter = router({
             input.choice,
           );
         } catch (err) {
-          if (err instanceof Error) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: err.message });
-          }
-          throw err;
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err instanceof Error ? err.message : String(err),
+          });
         }
         return { ok: true };
       }),
