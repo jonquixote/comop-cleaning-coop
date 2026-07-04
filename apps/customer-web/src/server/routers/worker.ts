@@ -118,7 +118,7 @@ export const workerRouter = router({
       withSessionTx(ctx.token, async (tx, sessionCtx) => {
         const memberId = await resolveMemberId(tx, sessionCtx);
         const a = await tx.query(
-          "SELECT 1 FROM job_assignments WHERE job_id = $1 AND member_id = $2 AND co_op_id = $3",
+          "SELECT 1 FROM job_assignments WHERE job_id = $1 AND member_id = $2 AND co_op_id = $3 AND status <> 'cancelled'",
           [input.jobId, memberId, sessionCtx.coOpId],
         );
         if ((a.rowCount ?? 0) === 0)
@@ -146,7 +146,8 @@ export const workerRouter = router({
             const r = await tx.query<{ id: string; tasks: unknown }>(
               `SELECT jcl.id, jcl.tasks FROM job_cleaning_checklists jcl
                JOIN job_assignments ja ON ja.job_id = jcl.job_id AND ja.co_op_id = jcl.co_op_id
-               WHERE jcl.id = $1 AND jcl.co_op_id = $2 AND ja.member_id = $3`,
+               WHERE jcl.id = $1 AND jcl.co_op_id = $2 AND ja.member_id = $3 AND ja.status <> 'cancelled'
+               FOR UPDATE OF jcl`,
               [input.checklistId, sessionCtx.coOpId, memberId],
             );
             if ((r.rowCount ?? 0) === 0)
