@@ -86,8 +86,16 @@ describe("capturePayment — capture + idempotency + guards", () => {
       const r = await capturePayment(tx, COOP_A, jobId, "pi_charge_null");
       expect(r.captured).toBe(true);
 
+      // Same null value flows to both the jobs UPDATE and the payments INSERT
+      // (charge was not surfaced in this webhook); verify both tables reflect it.
       const j = await tx.query("SELECT stripe_charge_id FROM jobs WHERE id=$1", [jobId]);
       expect(j.rows[0].stripe_charge_id).toBeNull();
+      const p = await tx.query(
+        "SELECT stripe_charge_id FROM payments WHERE job_id = $1",
+        [jobId],
+      );
+      expect(p.rows).toHaveLength(1);
+      expect(p.rows[0].stripe_charge_id).toBeNull();
     });
   });
 
