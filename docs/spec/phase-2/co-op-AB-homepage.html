@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Westside Household Co-op — worker-owned home services, Los Angeles</title>
+<meta name="description" content="Professional home cleaning and household help on LA's Westside — bonded, insured, and owned by the workers themselves. Founding member list now open.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6F3EC; --ink:#1E2A24; --ledger:#1D5C43; --spine:#B23A2F;
+  --pencil:#7D786C; --rule:#D8D2C4; --paper-deep:#EFEAE0;
+  --measure:680px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:'Public Sans',system-ui,sans-serif;
+  font-size:17px; line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:var(--measure); margin:0 auto; padding:0 22px}
+.eyebrow{
+  font-family:'IBM Plex Mono',monospace; font-size:11.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ledger); font-weight:500;
+}
+/* ---------- masthead ---------- */
+header{padding:26px 0 0}
+.mast{display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid var(--ink); padding-bottom:14px}
+.mast .name{font-family:'Fraunces',serif; font-weight:700; font-size:19px; letter-spacing:-.01em}
+.mast .area{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--pencil); letter-spacing:.08em; text-transform:uppercase}
+/* ---------- hero ---------- */
+.hero{padding:64px 0 40px}
+.hero h1{
+  font-family:'Fraunces',serif; font-weight:600; letter-spacing:-.015em;
+  font-size:clamp(38px,7.2vw,58px); line-height:1.06; margin:14px 0 22px;
+}
+.hero .sub{font-size:19px; line-height:1.6; color:#3A443E; max-width:600px}
+.hero .sub strong{color:var(--ink)}
+/* ---------- section chrome ---------- */
+section{padding:44px 0 8px}
+.rule-head{display:flex; align-items:center; gap:14px; margin-bottom:26px}
+.rule-head::after{content:""; flex:1; height:1px; background:var(--ink); opacity:.85}
+/* ---------- the ledger (signature) ---------- */
+.ledger{
+  background:#FDFBF6; border:1px solid var(--ink);
+  box-shadow:5px 5px 0 var(--paper-deep);
+  padding:26px 24px 20px; margin:8px 0 10px;
+}
+.ledger .l-title{font-family:'Fraunces',serif; font-weight:600; font-size:21px; margin-bottom:4px}
+.ledger .l-note{font-size:14px; color:var(--pencil); margin-bottom:18px}
+.l-row{
+  display:flex; justify-content:space-between; align-items:baseline; gap:16px;
+  padding:11px 2px; border-bottom:1px dotted var(--rule);
+  opacity:0; transform:translateY(6px); transition:opacity .5s ease, transform .5s ease;
+}
+.l-row.in{opacity:1; transform:none}
+@media (prefers-reduced-motion: reduce){.l-row{opacity:1; transform:none; transition:none}}
+.l-row .d{font-size:15.5px; line-height:1.45}
+.l-row .d small{display:block; color:var(--pencil); font-size:13px}
+.l-row .amt{font-family:'IBM Plex Mono',monospace; font-size:16px; font-weight:500; white-space:nowrap; font-variant-numeric:tabular-nums}
+.l-row.zero{border-bottom:2px solid var(--ink)}
+.l-row.zero .d, .l-row.zero .amt{color:var(--spine); font-weight:600}
+.l-row.total .d,.l-row.total .amt{font-weight:600}
+.l-row.total{border-bottom:none; padding-top:14px}
+/* ---------- offer table ---------- */
+.offers{border:1px solid var(--ink); background:#FDFBF6; box-shadow:5px 5px 0 var(--paper-deep)}
+.offer{display:flex; justify-content:space-between; gap:16px; align-items:baseline; padding:18px 22px; border-bottom:1px solid var(--rule)}
+.offer:last-child{border-bottom:none}
+.offer .o-name{font-family:'Fraunces',serif; font-weight:600; font-size:19px}
+.offer .o-desc{font-size:14px; color:#4A534D; margin-top:3px; max-width:380px}
+.offer .o-price{font-family:'IBM Plex Mono',monospace; font-size:18px; font-weight:500; white-space:nowrap; text-align:right}
+.offer .o-price small{display:block; font-size:11.5px; color:var(--pencil); font-weight:400}
+/* ---------- trust rows ---------- */
+.trust{list-style:none; margin-top:4px}
+.trust li{
+  display:flex; gap:14px; padding:13px 2px; border-bottom:1px dotted var(--rule);
+  font-size:15.5px; align-items:baseline;
+}
+.trust li::before{
+  content:"✓"; font-family:'IBM Plex Mono',monospace; color:var(--ledger); font-weight:600; flex:0 0 auto;
+}
+.trust li strong{font-weight:600}
+/* ---------- reserve ---------- */
+.reserve{background:var(--ink); color:var(--paper); padding:46px 0 52px; margin-top:56px}
+.reserve h2{font-family:'Fraunces',serif; font-weight:600; font-size:clamp(26px,5vw,34px); line-height:1.15; margin-bottom:10px}
+.reserve p{color:#C9CFC6; max-width:560px}
+.reserve .dep-note{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#A8B0A6; margin-top:10px}
+.rform{margin-top:26px; display:grid; gap:12px; max-width:460px}
+.rform input,.rform select{
+  font-family:'Public Sans',sans-serif; font-size:16px; padding:13px 14px;
+  background:#2A362F; border:1px solid #4A564F; color:var(--paper); border-radius:0;
+  width:100%;
+}
+.rform input::placeholder{color:#8B958D}
+.rform input:focus,.rform select:focus,button:focus,a:focus{outline:2px solid #E8C87A; outline-offset:2px}
+.btn{
+  font-family:'Public Sans',sans-serif; font-weight:600; font-size:17px;
+  background:var(--spine); color:#FDFBF6; border:none; padding:16px 22px;
+  cursor:pointer; width:100%; letter-spacing:.01em;
+}
+.btn:hover{background:#9E3227}
+.form-msg{font-size:14px; color:#E8C87A; min-height:20px}
+/* ---------- faq ---------- */
+.faq details{border-bottom:1px solid var(--rule); padding:4px 0}
+.faq summary{
+  font-weight:600; font-size:16px; padding:14px 0; cursor:pointer; list-style:none;
+  display:flex; justify-content:space-between; gap:12px;
+}
+.faq summary::after{content:"+"; font-family:'IBM Plex Mono',monospace; color:var(--ledger)}
+.faq details[open] summary::after{content:"–"}
+.faq .a{padding:0 0 16px; font-size:15.5px; color:#3A443E; max-width:600px}
+/* ---------- footer ---------- */
+footer{padding:40px 0 60px; font-size:13px; color:var(--pencil); line-height:1.7}
+footer .fine{max-width:600px}
+.switch{margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:12px}
+.switch a{color:var(--ledger)}
+@media(max-width:560px){
+  .offer{flex-direction:column; gap:6px}
+  .offer .o-price{text-align:left}
+}
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <div class="mast">
+    <div class="name">Westside Household Co-op</div>
+    <div class="area">Los Angeles · Westside</div>
+  </div>
+</header>
+
+<!-- ================= HERO ================= -->
+<div class="wrap hero">
+  <div class="eyebrow" id="hero-eyebrow">Founding member list · Now forming</div>
+  <h1 id="hero-h1"></h1>
+  <p class="sub" id="hero-sub"></p>
+</div>
+
+<!-- ================= THE OFFER ================= -->
+<section class="wrap">
+  <div class="rule-head"><span class="eyebrow">The offer</span></div>
+  <div class="offers" id="offer-table"></div>
+</section>
+
+<!-- ================= THE MATH (signature ledger) ================= -->
+<section class="wrap">
+  <div class="rule-head"><span class="eyebrow">Where your money goes</span></div>
+  <div class="ledger">
+    <div class="l-title" id="ledger-title"></div>
+    <div class="l-note">No cleaning company will show you this table. We open with it.</div>
+    <div id="ledger-rows"></div>
+  </div>
+</section>
+
+<!-- ================= WHO COMES ================= -->
+<section class="wrap">
+  <div class="rule-head"><span class="eyebrow">Who comes to your home</span></div>
+  <ul class="trust" id="trust-rows"></ul>
+</section>
+
+<!-- ================= WHY A CO-OP ================= -->
+<section class="wrap">
+  <div class="rule-head"><span class="eyebrow">Why worker-owned</span></div>
+  <p style="max-width:620px; font-size:16.5px">
+    A cleaning company keeps the difference between what you pay and what the cleaner earns.
+    A gig app keeps it and adds a stranger every visit. We removed that layer entirely:
+    the people who clean, drive, and cook <strong>own the company, vote on its rules, and split its
+    surplus</strong>. Turnover in worker co-ops runs at roughly half the industry rate — which is the
+    real reason you get the <em>same trusted person</em> at your door, visit after visit.
+  </p>
+</section>
+
+<!-- ================= RESERVE ================= -->
+<div class="reserve" id="reserve">
+  <div class="wrap">
+    <h2>Reserve a founding spot</h2>
+    <p id="reserve-sub"></p>
+    <p class="dep-note">$35 deposit · fully refundable any time before your first visit · credited to your first service</p>
+    <div class="rform">
+      <input type="text" id="f-name" placeholder="Your name" autocomplete="name">
+      <input type="tel" id="f-phone" placeholder="Mobile number" autocomplete="tel">
+      <input type="text" id="f-zip" placeholder="ZIP code" inputmode="numeric" autocomplete="postal-code" maxlength="5">
+      <button class="btn" id="reserve-btn">Reserve my spot · $35</button>
+      <div class="form-msg" id="form-msg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= FAQ ================= -->
+<section class="wrap faq">
+  <div class="rule-head"><span class="eyebrow">Questions, answered straight</span></div>
+  <details>
+    <summary>Is the deposit actually refundable?</summary>
+    <div class="a">Yes — in full, any time before your first visit, no reason needed. One text. If we don't launch in your neighborhood, it comes back automatically.</div>
+  </details>
+  <details>
+    <summary>Who exactly shows up?</summary>
+    <div class="a">A worker-owner of the cooperative — Live Scan background-checked, bonded, and insured before any first visit. For household roles involving children: TrustLine-registered and pediatric-CPR certified. You meet your person before the first visit, and the same person returns each time, with a vetted co-op backup when she's sick — so a sick day never strands you.</div>
+  </details>
+  <details>
+    <summary>Are you a licensed company?</summary>
+    <div class="a">We are organizing as a California worker cooperative corporation — the legal form built for businesses owned by their workers. General liability insurance, fidelity bonding, and workers' compensation are in place before any first visit. We'll show you the certificates; ask.</div>
+  </details>
+  <details>
+    <summary>Why do you cost more than a cash cleaner?</summary>
+    <div class="a">Cash prices are usually subsidized by no insurance, no taxes, and no protection for anyone — including you. Our price carries real wages, real workers' comp, bonding, and liability coverage. The table above shows every dollar. What we cost <em>less</em> than: the big cleaning brands, and nanny agencies charging thousands in placement fees.</div>
+  </details>
+  <details>
+    <summary>Where do you operate?</summary>
+    <div class="a">Launching across LA's Westside: Santa Monica, Mar Vista, Culver City, Brentwood, Pacific Palisades, West LA, Venice, and nearby. Founding spots are neighborhood-limited so routes stay tight and your times stay reliable.</div>
+  </details>
+</section>
+
+<footer class="wrap">
+  <div class="fine">
+    Westside Household Co-op (working name) is organizing as a California worker cooperative
+    corporation. Deposits are held fully refundable until your first scheduled visit and applied
+    as credit to your first service. Every worker is an employee with wage protections, workers'
+    compensation, and an ownership stake — that's the whole point.
+  </div>
+  <div class="switch">Looking for the other service? <a href="#" id="switch-link"></a></div>
+</footer>
+
+<script>
+/* ================= CONFIG — patch these two blocks, redeploy ================= */
+const CONFIG = {
+  STRIPE_LINK: { a: "", b: "" },      // Stripe Payment Link URLs ($35, refundable) — Johnny supplies
+  EVENTS_URL:  "",                     // Supabase REST insert endpoint (…/rest/v1/events)
+  EVENTS_KEY:  ""                      // Supabase anon key
+};
+/* ============================================================================ */
+
+/* ---------- variant assignment: /clean|/a → A, /retainer|/b → B, ?v=, else 50/50 persisted ---------- */
+function assignVariant(){
+  const p = location.pathname.toLowerCase(), q = new URLSearchParams(location.search).get('v');
+  if(q==='a'||q==='b') return q;
+  if(p.includes('clean')||p==='/a') return 'a';
+  if(p.includes('retainer')||p==='/b') return 'b';
+  try{
+    let v = localStorage.getItem('whc_v');
+    if(!v){ v = Math.random()<0.5?'a':'b'; localStorage.setItem('whc_v', v); }
+    return v;
+  }catch(e){ return Math.random()<0.5?'a':'b'; }
+}
+const V = assignVariant();
+const SID = (()=>{ try{ let s=localStorage.getItem('whc_sid'); if(!s){s=Math.random().toString(36).slice(2)+Date.now().toString(36); localStorage.setItem('whc_sid',s);} return s; }catch(e){ return 'anon'; } })();
+
+/* ---------- event beacon (graceful no-op until wired) ---------- */
+function track(event, extra){
+  const payload = { event, variant: V, session_id: SID, path: location.pathname,
+                    referrer: document.referrer||null, extra: extra||null };
+  console.log('[whc]', payload);
+  if(!CONFIG.EVENTS_URL) return;
+  try{
+    fetch(CONFIG.EVENTS_URL, {
+      method:'POST', keepalive:true,
+      headers:{ 'Content-Type':'application/json', 'apikey':CONFIG.EVENTS_KEY,
+                'Authorization':'Bearer '+CONFIG.EVENTS_KEY, 'Prefer':'return=minimal' },
+      body: JSON.stringify(payload)
+    }).catch(()=>{});
+  }catch(e){}
+}
+
+/* ---------- copy ---------- */
+const COPY = {
+a: {
+  h1: 'The cleaner owns<br>the company.',
+  sub: 'Professional home cleaning on the Westside — <strong>bonded, insured, and worker-owned</strong>. The same trusted person every visit, a covered backup when she\'s sick, and every dollar of your price accounted for below.',
+  offers: [
+    {n:'Standard clean · 3 hours', d:'Kitchen, baths, floors, surfaces, one load of laundry folded. One professional, your regular.', p:'$175', s:'per visit'},
+    {n:'Deep clean · 5 hours', d:'Everything above plus inside oven & fridge, baseboards, interior windows, the neglected corners.', p:'$290', s:'per visit'},
+    {n:'Recurring · every two weeks', d:'The standard clean on a rhythm, same person, priority scheduling.', p:'$165', s:'per visit'}
+  ],
+  ledgerTitle: 'Your $58 hour, line by line',
+  ledger: [
+    {d:'Your cleaner\'s wage', s:'≈ $29.50/hr — about 51% above the LA industry average', a:'$29.50'},
+    {d:'Insurance, payroll taxes & workers\' comp', s:'Real coverage: liability, bonding, comp — the protection cash cleaners skip', a:'$10.20'},
+    {d:'Supplies, mileage & systems', s:'Green supplies, legally required mileage reimbursement, scheduling', a:'$9.65'},
+    {d:'Co-op reserve & member surplus', s:'Voted on by the workers; builds the co-op and returns to them', a:'$4.65'},
+    {d:'To an owner or franchise', s:'There isn\'t one. The workers are the owners.', a:'$0.00', z:true},
+    {d:'What you pay', s:'', a:'$58.00', t:true}
+  ],
+  trust: [
+    '<strong>Live Scan background check</strong> (DOJ + FBI fingerprint) before any first visit',
+    '<strong>Bonded and insured</strong> — $1M liability, fidelity bond; certificates shown on request',
+    '<strong>The same person every visit</strong> — and a vetted co-op backup so a sick day never cancels on you',
+    '<strong>A worker-owner, not a gig stranger</strong> — she votes on the rules and shares the surplus',
+    '<strong>Flat quotes up front</strong> — the price we text you is the price you pay'
+  ],
+  reserveSub: 'We\'re opening a limited founding list on the Westside so routes stay tight. A refundable $35 holds your spot and locks founding pricing for your first year.',
+  switchText: 'See the full household retainer →', switchHref: '/retainer'
+},
+b: {
+  h1: 'One trusted person for<br>your whole household.',
+  sub: 'Cleaning while you\'re out. School pickup at 3. Dinner started by 5. One vetted, <strong>CPR-certified professional</strong> — with a covered backup when she\'s sick — from a worker-owned co-op. The way LA households have always actually run, made legal, insured, and reliable.',
+  offers: [
+    {n:'Afternoons · 12 hrs/week', d:'Three afternoons: house reset, school pickup, homework supervision, dinner started.', p:'$540', s:'per week · $45/hr'},
+    {n:'School days · 20 hrs/week', d:'Every weekday afternoon, plus a weekly full clean woven in.', p:'$880', s:'per week · $44/hr'},
+    {n:'Full household · 40 hrs/week', d:'Your household, handled: cleaning, kids, cooking, errands, one person.', p:'$1,760', s:'per week · $44/hr'}
+  ],
+  ledgerTitle: 'Your $44 hour, line by line',
+  ledger: [
+    {d:'Your household professional\'s wage', s:'≈ $26/hr on full, continuous days — a stable ~$55,000/yr', a:'$26.20'},
+    {d:'Insurance, payroll taxes & workers\' comp', s:'Liability, bonding, comp — plus childcare-specific coverage', a:'$8.30'},
+    {d:'Vetting, training & systems', s:'TrustLine registry, pediatric CPR, mileage, scheduling', a:'$5.95'},
+    {d:'Co-op reserve & member surplus', s:'Voted on by the workers; builds the co-op and returns to them', a:'$3.55'},
+    {d:'To an agency or placement fee', s:'Nanny agencies charge families thousands in placement fees. We charge $0.', a:'$0.00', z:true},
+    {d:'What you pay', s:'', a:'$44.00', t:true}
+  ],
+  trust: [
+    '<strong>TrustLine-registered</strong> — California\'s official childcare background registry (DOJ + FBI + child-abuse index)',
+    '<strong>Pediatric CPR & first-aid certified</strong> before any first shift with your kids',
+    '<strong>Licensed, insured driver</strong> — annual driving-record checks; your car seat or ours, installed right',
+    '<strong>The same person, plus a bench</strong> — a vetted co-op backup means a sick day never strands a working parent',
+    '<strong>A worker-owner earning a real wage</strong> — which is why she stays, and your kids keep their person'
+  ],
+  reserveSub: 'Retainer spots are the scarcest thing we offer — each one is a real person\'s stable week. A refundable $35 starts the conversation and holds your place in line.',
+  switchText: 'Just need a great clean? →', switchHref: '/clean'
+}
+};
+
+/* ---------- render ---------- */
+const C = COPY[V];
+document.getElementById('hero-h1').innerHTML = C.h1;
+document.getElementById('hero-sub').innerHTML = C.sub;
+document.getElementById('offer-table').innerHTML = C.offers.map(o=>
+  `<div class="offer"><div><div class="o-name">${o.n}</div><div class="o-desc">${o.d}</div></div>
+   <div class="o-price">${o.p}<small>${o.s}</small></div></div>`).join('');
+document.getElementById('ledger-title').textContent = C.ledgerTitle;
+document.getElementById('ledger-rows').innerHTML = C.ledger.map(r=>
+  `<div class="l-row${r.z?' zero':''}${r.t?' total':''}"><div class="d">${r.d}${r.s?`<small>${r.s}</small>`:''}</div>
+   <div class="amt">${r.a}</div></div>`).join('');
+document.getElementById('trust-rows').innerHTML = C.trust.map(t=>`<li>${t}</li>`).join('');
+document.getElementById('reserve-sub').textContent = C.reserveSub;
+const sw = document.getElementById('switch-link'); sw.textContent = C.switchText; sw.href = C.switchHref;
+document.title = V==='a' ? 'Worker-owned home cleaning — LA Westside | Westside Household Co-op'
+                         : 'One trusted person for your household — LA Westside | Westside Household Co-op';
+
+/* ---------- ledger write-in animation ---------- */
+const rows = document.querySelectorAll('.l-row');
+const io = new IntersectionObserver(es=>{
+  es.forEach(e=>{ if(e.isIntersecting){
+    [...rows].forEach((r,i)=>setTimeout(()=>r.classList.add('in'), i*90));
+    io.disconnect();
+  }});
+},{threshold:.3});
+if(rows.length) io.observe(rows[0]);
+
+/* ---------- reserve flow: lead first, then deposit ---------- */
+track('page_view');
+document.getElementById('reserve-btn').addEventListener('click', ()=>{
+  const name=document.getElementById('f-name').value.trim(),
+        phone=document.getElementById('f-phone').value.trim(),
+        zip=document.getElementById('f-zip').value.trim(),
+        msg=document.getElementById('form-msg');
+  track('reserve_click');
+  if(!name || phone.replace(/\D/g,'').length<10 || zip.length<5){
+    msg.textContent='Name, mobile number, and ZIP — that\'s all we need.'; return;
+  }
+  track('lead_submit', {name, phone, zip});
+  const link = CONFIG.STRIPE_LINK[V];
+  if(link){
+    track('deposit_redirect');
+    location.href = link;
+  } else {
+    track('deposit_link_pending', {name, phone, zip});
+    msg.textContent='You\'re on the list — deposit link opens within 24 hours and we\'ll text it to you first.';
+    document.getElementById('reserve-btn').textContent='Spot requested ✓';
+    document.getElementById('reserve-btn').disabled=true;
+  }
+});
+</script>
+</body>
+</html>
