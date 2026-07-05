@@ -16,4 +16,6 @@ coverage/
 
 # Backups — encrypted dumps live off-box, never in the repo
 *.dump.enc
+# Raw pg_dump artifacts (restore-drill snapshots) — transient, contain real data, never commit
+*.dump
 comop-offsite/
