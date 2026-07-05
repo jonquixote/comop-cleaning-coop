@@ -35,5 +35,15 @@ On a bare box: `docker compose up` (local dev only — see ADR-0006) or start th
 - **`BACKUP_PASS`:** rotate by taking a fresh backup under the new pass; keep the old pass until all backups encrypted under it age out of retention (else old backups become undecryptable).
 - **TLS / Postgres certs:** rotate on the host; restart Postgres; verify app reconnects. (Expand when TLS terminates at the app.)
 
+## Stripe webhooks — payment capture (ADR-0012)
+- **Endpoint:** `POST /api/webhook` (`apps/customer-web/src/app/api/webhook/route.ts`). Verifies the Stripe signature over the raw body, then captures via `capturePayment`. Payment-path failures **page now** (see posture above).
+- **Config:** `STRIPE_WEBHOOK_SECRET` (`whsec_…`) is **required** — if unset, the endpoint rejects every delivery (400, fail closed). Get it from:
+  - local/test: `stripe listen --forward-to localhost:3000/api/webhook` prints the `whsec_…`;
+  - staging/prod: the Stripe **dashboard** webhook endpoint (Developers → Webhooks). Register the deployed URL, subscribe to `payment_intent.succeeded`, copy the signing secret into the environment.
+- **`STRIPE_SECRET_KEY`:** `sk_test_…` in test/staging, `sk_live_…` in prod. Never commit; rotate any key exposed in chat/PR/logs (Stripe dashboard → API keys → roll). Test and live keys are separate — a test key cannot touch real money.
+- **Expected responses (for triage):** `400` = bad/absent signature or secret unconfigured (delivery rejected). `200` = handled, duplicate no-op, unhandled event type, or a job not yet `done` (logged, not transitioned — Stripe stops retrying). `500` = unexpected/transient (e.g. DB down) — Stripe retries; investigate.
+- **Duplicate deliveries are safe:** idempotency is enforced by `webhook_events` UNIQUE(stripe_event_id) inside `capturePayment` — a replay is a no-op, never a double-charge.
+- **If payments aren't capturing:** check the Stripe dashboard webhook delivery log (response codes), confirm `STRIPE_WEBHOOK_SECRET` matches the registered endpoint, and grep app logs for `webhook:` lines. A run of `400`s usually means a secret mismatch after a redeploy.
+
 ## Failover (deferred until downtime cost justifies it — impl §3.5)
 A streaming replica for failover; schema/ops do not preclude it. Until then, recovery = restore latest off-site backup per above (RTO ≤ 1 hour).
